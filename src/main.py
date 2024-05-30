@@ -1,10 +1,12 @@
 import tkinter as tk
 import tkinter.font as tkFont
 
+from game import Game
+
 
 # main tkinter menu for game startup
-def menu():
-    # setup tkinter menu
+def startup_menu():
+    # setup tkinter window
     menu_root = tk.Tk()
     menu_root.title('Minesweeper')
     # TODO: Figure out how to change tkinter icon.
@@ -13,7 +15,7 @@ def menu():
     menu_root.geometry('400x400')
     menu_root.resizable(False, False)
 
-    # initialize styles
+    # initialize tkinter styles
     title_font = tkFont.Font(family='Courier New', size=20, weight=tkFont.BOLD)
     subtitle_font = tkFont.Font(family='Helvetica', size=12, weight=tkFont.BOLD)
     body_font = tkFont.Font(family='Helvetica', size=10, weight=tkFont.NORMAL)
@@ -36,10 +38,20 @@ def menu():
     player_name = tk.StringVar()
     tk.Entry(name_frame, textvariable=player_name, font=body_font, width=15).pack()
     
-    tk.Button(menu_root, text='Start', font=subtitle_font, width=15, height=2, bg='lime').pack(side='bottom', pady=padding*2)
+    tk.Button(menu_root, text='Start', font=subtitle_font, width=15, height=2, bg='lime',
+              command=lambda: start_game(menu_root, {'difficulty': difficulty.get(), 'name': player_name.get()})).pack(side='bottom', pady=padding*2)
 
     menu_root.mainloop()
 
 
+# starts the game with information entered via the tkinter menu
+def start_game(root, game_info):
+    root.destroy()
+    difficulty = game_info['difficulty']
+    player_name = game_info['name']
+    game = Game(difficulty)
+    game.start()
+
+
 if __name__ == '__main__':
-    menu()
+    startup_menu()
