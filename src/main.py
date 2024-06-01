@@ -1,7 +1,12 @@
 import tkinter as tk
 import tkinter.font as tkFont
 
+from const import ROOT_DIR
 from game import Game
+
+
+TK_WIDTH = 400
+TK_HEIGHT = 400
 
 
 # main tkinter menu for game startup
@@ -10,9 +15,13 @@ def startup_menu():
     menu_root = tk.Tk()
     menu_root.title('Minesweeper')
     # TODO: Figure out how to change tkinter icon.
-    # icon_image = tk.PhotoImage('../textures/icon.png')
+    # icon_image = tk.PhotoImage(ROOT_DIR + '/textures/icon.png')
     # menu_root.iconimage(False, icon_image)
-    menu_root.geometry('400x400')
+    screen_width = menu_root.winfo_screenwidth()
+    screen_height = menu_root.winfo_screenheight()
+    x = screen_width / 2 - TK_WIDTH / 2
+    y = screen_height / 2 -TK_HEIGHT / 2
+    menu_root.geometry('%dx%d+%d+%d' % (TK_WIDTH, TK_HEIGHT, x, y))
     menu_root.resizable(False, False)
 
     # initialize tkinter styles
@@ -45,7 +54,7 @@ def startup_menu():
 
 
 # starts the game with information entered via the tkinter menu
-def start_game(root, game_info):
+def start_game(root, game_info: tuple[str, str]):
     root.destroy()
     difficulty = game_info['difficulty']
     player_name = game_info['name']
