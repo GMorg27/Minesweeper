@@ -14,7 +14,7 @@ class Tile(Sprite):
         
         sprite_pos = ((position[0]*TILE_SIZE + top_left[0]), (position[1]*TILE_SIZE + top_left[1]))
         super().__init__(self.surfaces[self.state], sprite_pos,
-                         self.left_click, self.right_click)
+                         self.left_click, self.right_click, self.mouse_press, self.mouse_unpress)
 
     # left click uncovers the tile and possibly its surroundings
     def left_click(self):
@@ -35,6 +35,16 @@ class Tile(Sprite):
             elif self.state == TileStates.FLAG:
                 self.update_state(TileStates.HIDDEN)
                 self.game_object.flags.remove(self.position)
+    
+    # holding left click on a hidden tile displays the uncovered texture
+    def mouse_press(self):
+        if not self.game_object.game_over:
+            if self.state == TileStates.HIDDEN:
+                self.image = self.surfaces[TileStates.UNCOVERED]
+    
+    # revert tile texture to actual state
+    def mouse_unpress(self):
+        self.image = self.surfaces[self.state]
 
     # change the tile's state and update to the corresponding texture
     def update_state(self, new_state: TileStates):

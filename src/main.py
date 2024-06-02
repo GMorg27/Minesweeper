@@ -14,9 +14,8 @@ def startup_menu():
     # setup tkinter window
     menu_root = tk.Tk()
     menu_root.title('Minesweeper')
-    # TODO: Figure out how to change tkinter icon.
-    # icon_image = tk.PhotoImage(ROOT_DIR + '/textures/icon.png')
-    # menu_root.iconimage(False, icon_image)
+    icon_image = tk.PhotoImage(ROOT_DIR + '/assets/textures/mine.ico')
+    menu_root.iconbitmap(False, icon_image)
     screen_width = menu_root.winfo_screenwidth()
     screen_height = menu_root.winfo_screenheight()
     x = screen_width / 2 - TK_WIDTH / 2
