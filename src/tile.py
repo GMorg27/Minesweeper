@@ -9,17 +9,21 @@ class Tile(Sprite):
         self.game_object = game
         self.state = TileStates.HIDDEN
         self.surfaces = surfaces
-        self.position = position
-        self.is_mine = False
+        self.position: tuple[int, int] = position
+        self.is_mine: bool = False
         
         sprite_pos = ((position[0]*TILE_SIZE + top_left[0]), (position[1]*TILE_SIZE + top_left[1]))
         super().__init__(self.surfaces[self.state], sprite_pos,
                          self.left_click, self.right_click, self.mouse_press, self.mouse_unpress)
 
     # left click uncovers the tile and possibly its surroundings
-    def left_click(self):
+    def left_click(self, buttons: tuple[bool, bool, bool]):
         if not self.game_object.game_over:
-            if self.state == TileStates.HIDDEN:
+            # right mouse button also pressed
+            if buttons[2]:
+                if self.state != TileStates.FLAG:
+                    self.game_object.chord(self.position, self.state)
+            elif self.state == TileStates.HIDDEN:
                 if self.is_mine:
                     self.update_state(TileStates.MINE_HIT)
                     self.game_object.loss()
@@ -27,20 +31,27 @@ class Tile(Sprite):
                     self.game_object.uncover(self.position)
 
     # right click toggles whether the tile is flagged
-    def right_click(self):
+    def right_click(self, buttons: tuple[bool, bool, bool]):
         if not self.game_object.game_over:
-            if self.state == TileStates.HIDDEN:
+            # left mouse button also pressed
+            if buttons[0]:
+                self.game_object.chord(self.position, self.state)
+            elif self.state == TileStates.HIDDEN:
                 self.update_state(TileStates.FLAG)
                 self.game_object.flags.append(self.position)
             elif self.state == TileStates.FLAG:
                 self.update_state(TileStates.HIDDEN)
                 self.game_object.flags.remove(self.position)
     
-    # holding left click on a hidden tile displays the uncovered texture
-    def mouse_press(self):
+    # display hidden tile press texture or do chording based on mouse button(s) pressed
+    def mouse_press(self, buttons: tuple[bool, bool, bool]):
         if not self.game_object.game_over:
-            if self.state == TileStates.HIDDEN:
-                self.image = self.surfaces[TileStates.UNCOVERED]
+            # left click
+            if buttons[0]:
+                if buttons[2]:
+                    self.game_object.press_chord(self.position, self.state)
+                elif self.state == TileStates.HIDDEN:
+                    self.image = self.surfaces[TileStates.UNCOVERED]
     
     # revert tile texture to actual state
     def mouse_unpress(self):
