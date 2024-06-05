@@ -1,4 +1,4 @@
-from const import MARGIN, TILE_SIZE
+from const import TILE_SIZE
 from sprite import Sprite
 from tile_states import TileStates
 

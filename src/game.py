@@ -2,6 +2,7 @@ import pygame
 from pygame.locals import *
 import random
 
+from button import Button
 from const import MARGIN, ROOT_DIR, TILE_SIZE
 from sprite import Sprite
 from tile import Tile
@@ -30,7 +31,7 @@ FRAMERATE = 30
 
 # pygame window specifications
 BG_COLOR = (200, 200, 200)
-BANNER_HEIGHT = 3 * TILE_SIZE
+BANNER_HEIGHT = 3.5 * TILE_SIZE
 BANNER_COLOR = (180, 180, 180)
 BANNER_FONT_SIZE = 25
 BANNER_FONT_COLOR = (255, 0, 0)
@@ -48,6 +49,7 @@ class Game:
         self.cols: int = difficulty_data['cols']
         self.tiles: list[list[Tile]] = []
         self.tile_surfaces: list[pygame.Surface] = []
+        self.face_surfaces: list[pygame.Surface] = []
         self.mines: list[tuple[int, int]] = []
         self.flags: list[tuple[int, int]] = []
         self.to_chord: list[Tile] = []
@@ -78,6 +80,29 @@ class Game:
                 image.blit(tile_map, (0, 0), area)
                 self.tile_surfaces.append(image)
         
+        # load face button texture tuples (unclicked, clicked) from face_atlas.png
+        faces = pygame.image.load(ROOT_DIR + '/assets/textures/face_atlas.png')
+        hidden_area = ((TileStates.HIDDEN%4)*TILE_SIZE, int(TileStates.HIDDEN/4)*TILE_SIZE, TILE_SIZE, TILE_SIZE)
+        uncovered_area = ((TileStates.UNCOVERED%4)*TILE_SIZE, int(TileStates.UNCOVERED/4)*TILE_SIZE, TILE_SIZE, TILE_SIZE)
+        for x in range(4):
+            # place each face texture on top of unclicked and clicked tile textures
+            default_image = pygame.Surface((TILE_SIZE, TILE_SIZE))
+            clicked_image = pygame.Surface((TILE_SIZE, TILE_SIZE))
+            default_image.blit(tile_map, (0, 0), hidden_area)
+            clicked_image.blit(tile_map, (0, 0), uncovered_area)
+            default_image = pygame.transform.scale(default_image, (3*TILE_SIZE, 3*TILE_SIZE))
+            clicked_image = pygame.transform.scale(clicked_image, (3*TILE_SIZE, 3*TILE_SIZE))
+            # area on face_atlas.png to blit from
+            area = (x*TILE_SIZE, 0, TILE_SIZE, TILE_SIZE)
+            face_image = pygame.Surface((TILE_SIZE, TILE_SIZE), pygame.SRCALPHA)
+            face_image.blit(faces, (0, 0), area)
+            face_image = pygame.transform.scale(face_image, (2*TILE_SIZE, 2*TILE_SIZE))
+            face_loc = ((default_image.get_width() - face_image.get_width())/2, (default_image.get_height() - face_image.get_height())/2)
+            default_image.blit(face_image, face_loc)
+            clicked_image.blit(face_image, face_loc)
+            self.face_surfaces.append((default_image, clicked_image))
+        button_size = (default_image.get_width(), default_image.get_height())
+        
         # load tile sprites
         tile_group = pygame.sprite.Group()
         top_left = ((self.screen_width - self.cols*TILE_SIZE)/2, (self.screen_height - BANNER_HEIGHT - self.rows*TILE_SIZE)/2 + BANNER_HEIGHT)
@@ -98,6 +123,9 @@ class Game:
         flag_x = MARGIN * TILE_SIZE
         flag_y = (BANNER_HEIGHT - flag_image.get_height()) / 2
         flag_icon = Sprite(flag_image, (flag_x, flag_y))
+        button_x = (self.screen_width - button_size[0]) / 2
+        button_y = (BANNER_HEIGHT - button_size[1]) / 2
+        face_button = Button(self.face_surfaces, (button_x, button_y), left_click=None)
         
         # game loop
         clock = pygame.time.Clock()
@@ -111,8 +139,10 @@ class Game:
                 elif event.type == MOUSEBUTTONUP:
                     for sprite in tile_group:
                         sprite.check_click(event.pos, event.button)
+                    face_button.check_click(event.pos, event.button)
 
             if not self.quit:
+                face_button.check_mouse_press(pygame.mouse.get_pos())
                 if not self.game_over:
                     for sprite in tile_group:
                         if sprite not in self.to_chord:
@@ -141,7 +171,7 @@ class Game:
                 text_surface = self.banner_font.render(text, False, BANNER_FONT_COLOR, BANNER_FONT_BG)
                 timer = Sprite(text_surface,
                                (self.screen_width - MARGIN*TILE_SIZE - text_surface.get_width(), (BANNER_HEIGHT - BANNER_FONT_SIZE)/2))
-                banner_group.add(banner, flag_icon, flag_counter, timer)
+                banner_group.add(banner, flag_icon, flag_counter, timer, face_button)
 
                 # render game elements
                 self.screen.fill(BG_COLOR)
