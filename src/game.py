@@ -4,9 +4,9 @@ import random
 
 from button import Button
 from const import MARGIN, ROOT_DIR, TILE_SIZE
+from enums import FaceExpressions, TileStates
 from sprite import Sprite
 from tile import Tile
-from tile_states import TileStates
 
 
 # game metadata
@@ -38,9 +38,18 @@ BANNER_FONT_COLOR = (255, 0, 0)
 BANNER_FONT_BG = (0, 0, 0)
 
 
-# handles the pygame display and all game events
 class Game:
+    """
+    A class to handle the pygame window and all game events.
+    """
+
     def __init__(self, difficulty: str):
+        """
+        Initializes a Game object and the pygame window.
+
+        Params:
+            str: The game difficulty.
+        """
         difficulty_data = DIFFICULTIES[difficulty]
         self.game_over: bool = False
         self.quit: bool = False
@@ -48,6 +57,7 @@ class Game:
         self.rows: int = difficulty_data['rows']
         self.cols: int = difficulty_data['cols']
         self.tiles: list[list[Tile]] = []
+        self.visited: list[list[bool]] = [[False]*self.rows for y in range(self.cols)]
         self.tile_surfaces: list[pygame.Surface] = []
         self.face_surfaces: list[pygame.Surface] = []
         self.mines: list[tuple[int, int]] = []
@@ -55,6 +65,7 @@ class Game:
         self.to_chord: list[Tile] = []
         self.uncovered_tiles: int = 0
         self.time: float = 0.0
+        self.face_state = FaceExpressions.HAPPY
 
         # initialize pygame window
         if self.cols >= DIFFICULTIES['intermediate']['cols']:
@@ -64,13 +75,15 @@ class Game:
         self.screen_height = TILE_SIZE * (self.rows + 2*MARGIN) + BANNER_HEIGHT
         self.screen = pygame.display.set_mode((self.screen_width, self.screen_height))
         pygame.display.set_caption('Minesweeper')
-        icon =  pygame.image.load(ROOT_DIR + '/assets/textures/mine.png')
+        icon = pygame.image.load(ROOT_DIR + '/assets/textures/mine.png')
         pygame.display.set_icon(icon)
         pygame.font.init()
         self.banner_font = pygame.font.Font(ROOT_DIR + '/assets/fonts/timer.ttf', BANNER_FONT_SIZE)
         
-    # load game elements and execute main game loop
     def start(self):
+        """
+        Load game elements and execute main loop.
+        """
         # load tile textures from tile_atlas.png
         tile_map = pygame.image.load(ROOT_DIR + '/assets/textures/tile_atlas.png')
         for y in range(4):
@@ -125,7 +138,7 @@ class Game:
         flag_icon = Sprite(flag_image, (flag_x, flag_y))
         button_x = (self.screen_width - button_size[0]) / 2
         button_y = (BANNER_HEIGHT - button_size[1]) / 2
-        face_button = Button(self.face_surfaces, (button_x, button_y), left_click=None)
+        face_button = Button(self.face_surfaces, (button_x, button_y), left_click=self.restart)
         
         # game loop
         clock = pygame.time.Clock()
@@ -143,12 +156,26 @@ class Game:
 
             if not self.quit:
                 face_button.check_mouse_press(pygame.mouse.get_pos())
+
                 if not self.game_over:
-                    for sprite in tile_group:
-                        if sprite not in self.to_chord:
-                            sprite.check_mouse_press(pygame.mouse.get_pos())
-                    self.to_chord = []
+                    buttons_pressed = pygame.mouse.get_pressed()
+                    if buttons_pressed[0]:
+                        click_location = pygame.mouse.get_pos()
+                        bottom_right = (top_left[0] + TILE_SIZE*self.cols, top_left[1] + TILE_SIZE*self.rows)
+                        if click_location[0] >= top_left[0] and click_location[1] >= top_left[1] \
+                            and click_location[0] <= bottom_right[0] and click_location[1] <= bottom_right[1]:
+                            self.face_state = FaceExpressions.SHOCKED
+                        else:
+                            self.face_state = FaceExpressions.HAPPY
+                    else:
+                        self.face_state = FaceExpressions.HAPPY
                     
+                    if any(buttons_pressed):
+                        for sprite in tile_group:
+                            if sprite not in self.to_chord:
+                                sprite.check_mouse_press(pygame.mouse.get_pos())
+                    self.to_chord = []
+
                     self.time += 1.0 / FRAMERATE
 
                 # update banner elements
@@ -171,6 +198,7 @@ class Game:
                 text_surface = self.banner_font.render(text, False, BANNER_FONT_COLOR, BANNER_FONT_BG)
                 timer = Sprite(text_surface,
                                (self.screen_width - MARGIN*TILE_SIZE - text_surface.get_width(), (BANNER_HEIGHT - BANNER_FONT_SIZE)/2))
+                face_button.state = self.face_state
                 banner_group.add(banner, flag_icon, flag_counter, timer, face_button)
 
                 # render game elements
@@ -181,8 +209,32 @@ class Game:
             
             clock.tick(FRAMERATE)
     
-    # randomly populates the field with mines, excluding the clicked tile
+    def restart(self, buttons: tuple[bool, bool, bool]):
+        """
+        Reset game variables and Tiles.
+
+        Params:
+            tuple[bool, bool, bool]: Unused; passed in by face Button.
+        """
+        self.game_over = False
+        self.visited: list[list[bool]] = [[False]*self.rows for y in range(self.cols)]
+        self.mines = []
+        self.flags = []
+        self.uncovered_tiles: int = 0
+        self.time: float = 0.0
+
+        for x in range(self.cols):
+            for y in range(self.rows):
+                self.tiles[x][y].update_state(TileStates.HIDDEN)
+                self.tiles[x][y].is_mine = False
+
     def plant_mines(self, click_pos: tuple[int, int]):
+        """
+        Randomly populates the field with mines, excluding the clicked Tile.
+
+        Params:
+            tuple[int, int]: The position (x, y) within the field of the clicked Tile.
+        """
         for i in range(self.num_mines):
             while True:
                 rand_row = random.randint(0, self.rows - 1)
@@ -192,13 +244,19 @@ class Game:
                     self.mines.append((rand_col, rand_row))
                     break
 
-    # uncovers the tile at a given (x, y) position and possibly its surroundings
     def uncover(self, click_pos: tuple[int, int]):
+        """
+        Uncovers the Tile and its surroundings at a given position.
+
+        Params:
+            tuple[int, int]: The position (x, y) within the field of the Tile to uncover.
+        """
         if len(self.mines) == 0:
             self.plant_mines(click_pos)
 
         # perform breadth first search starting at the clicked tile
         bfs_queue = [click_pos]
+        self.visited[click_pos[0]][click_pos[1]] = True
         while len(bfs_queue) > 0:
             current = bfs_queue.pop(0)
             mine_count = 0
@@ -211,18 +269,37 @@ class Game:
                 for y in range(y_min, y_max + 1):
                     if (x, y) != (current[0], current[1]):
                         candidate = self.tiles[x][y]
-                        if candidate.state == TileStates.HIDDEN:
+                        if not self.visited[x][y] and candidate.state == TileStates.HIDDEN:
                             neighbors.append((x, y))
                         if candidate.is_mine:
                             mine_count += 1
+            
             self.tiles[current[0]][current[1]].update_state(TileStates.UNCOVERED + mine_count)
+            self.uncovered_tiles += 1
+
+            if self.uncovered_tiles == self.rows*self.cols - self.num_mines:
+                self.win()
+                return
 
             # stop searching along edges with neighboring mines
             if mine_count == 0:
                 bfs_queue.extend(neighbors)
+                for position in neighbors:
+                    self.visited[position[0]][position[1]] = True
 
-    # returns whether a tile can be chorded and the list of tiles that would be uncovered
     def get_chord_info(self, click_pos: tuple[int, int], num_flags: int) -> tuple[bool, list[Tile]]:
+        """
+        Checks if a tile can be chorded and gets the list of tiles that would be uncovered with a chord
+            (left and right click simultaneously).
+
+        Params:
+            tuple[int, int]: The position (x, y) within the field of the Tile.
+            int: The number of flags that must be adjacent to the Tile in order to chord.
+        
+        Returns:
+            tuple[bool, list[Tile]]: A boolean representing whether the Tile can currently be chorded
+                and the list of tiles that would be uncovered if the chord was valid.
+        """
         flag_count = 0
         neighbors = []
         x_min = click_pos[0] - 1 if click_pos[0] - 1 >= 0 else 0
@@ -240,8 +317,14 @@ class Game:
 
         return (flag_count == num_flags, neighbors)
 
-    # if the correct number of adjacent tiles has been flagged, uncover all adjacent hidden tiles
     def chord(self, click_pos: tuple[int, int], num_flags: int):
+        """
+        If the correct number of adjacent Tiles has been flagged, uncover all adjacent hidden Tiles.
+
+        Params:
+            tuple[int, int]: The position (x, y) within the field of the center Tile.
+            int: The number of flags that must be adjacent to the Tile in order to chord.
+        """
         chord_info = self.get_chord_info(click_pos, num_flags)
         self.to_chord = chord_info[1]
 
@@ -249,21 +332,39 @@ class Game:
             for tile in self.to_chord:
                 if tile.is_mine:
                     tile.update_state(TileStates.MINE_HIT)
-                    if not self.game_over:
-                        self.loss()
-                else:
+                    self.loss()
+                    return
+            
+            for tile in self.to_chord:
+                if not self.visited[tile.position[0]][tile.position[1]]:
                     self.uncover(tile.position)
     
-    # display pressed animation for all tiles that would be uncovered with a chord
     def press_chord(self, click_pos: tuple[int, int], num_flags: int):
+        """
+        Display the pressed texture for all Tiles that would be uncovered with a chord.
+
+        Params:
+            tuple[int, int]: The position (x, y) within the field of the center Tile.
+            int: The number of flags that must be adjacent to the Tile in order to chord.
+        """
         self.to_chord = self.get_chord_info(click_pos, num_flags)[1]
         for tile in self.to_chord:
             if tile.state == TileStates.HIDDEN:
                 tile.image = tile.surfaces[TileStates.UNCOVERED]
 
-    # ends the game and opens the loss display
-    def loss(self):
+    def win(self):
+        """
+        Ends the game and updates the face Button to signify a win.
+        """
         self.game_over = True
+        self.face_state = FaceExpressions.WIN
+
+    def loss(self):
+        """
+        Ends the game, reveals mistakes and remaining mines, and updates the face Button to signify a loss.
+        """
+        self.game_over = True
+        self.face_state = FaceExpressions.LOSE
         for pos in self.mines:
             self.tiles[pos[0]][pos[1]].reveal()
         for pos in self.flags:

@@ -9,8 +9,10 @@ TK_WIDTH = 400
 TK_HEIGHT = 400
 
 
-# main tkinter menu for game startup
 def startup_menu():
+    """
+    Sets up and displays the startup menu using tkinter.
+    """
     # setup tkinter window
     menu_root = tk.Tk()
     menu_root.title('Minesweeper')
@@ -52,8 +54,13 @@ def startup_menu():
     menu_root.mainloop()
 
 
-# starts the game with information entered via the tkinter menu
 def start_game(root, game_info: tuple[str, str]):
+    """
+    Starts the game with information entered via the tkinter window.
+
+    Params:
+        tuple[str, str]: A tuple containing the game difficulty and player's entered name.
+    """
     root.destroy()
     difficulty = game_info['difficulty']
     player_name = game_info['name']

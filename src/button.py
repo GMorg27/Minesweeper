@@ -1,9 +1,22 @@
+from pygame import Surface
+
 from sprite import Sprite
 
 
-# a general class for all buttons, sprites that can be left-clicked
 class Button(Sprite):
-    def __init__(self, surface_pairs, position: tuple[int, int], left_click):
+    """
+    A general class for buttons, Sprites that provide a function to execute upon left click.
+    """
+
+    def __init__(self, surface_pairs: list[tuple[Surface, Surface]], position: tuple[int, int], left_click):
+        """
+        Initializes a Button object.
+
+        Params:
+            list[tuple[Surface, Surface]]: A list of (clicked, unclicked) surface pairs that the Button will use.
+            tuple[int, int]: The position relative to the window at which to draw the Button (from top left).
+            Any: The function to execute upon left click.
+        """  
         self.surface_pairs = surface_pairs
         self.position: tuple[int, int] = position
         self.left_click = left_click
@@ -13,13 +26,18 @@ class Button(Sprite):
         super().__init__(self.surface_pairs[self.state][self.is_clicked], position,
                          left_click, right_click=None, mouse_press=self.mouse_press, mouse_unpress=self.mouse_unpress)
 
-    # display clicked surface
     def mouse_press(self, buttons: tuple[bool, bool, bool]):
+        """
+        Displays clicked surface in current state.
+        """
         if buttons[0]:
             self.is_clicked = True
             self.image = self.surface_pairs[self.state][self.is_clicked]
     
-    # revert to default surface
     def mouse_unpress(self):
+        """
+        Reverts to default, unclicked surface in current state.
+        """
         self.is_clicked = False
         self.image = self.surface_pairs[self.state][self.is_clicked]
+        
