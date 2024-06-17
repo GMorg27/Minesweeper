@@ -1,13 +1,13 @@
-import pygame
+from pygame import Rect, Surface, mouse, sprite
 from pygame.locals import *
 
 
-class Sprite(pygame.sprite.Sprite):
+class Sprite(sprite.Sprite):
     """
     Wrapper class for pygame Sprite.
     """
 
-    def __init__(self, image: pygame.Surface, position: tuple[int, int], left_click=None, right_click=None, mouse_press=None, mouse_unpress=None):
+    def __init__(self, image: Surface, position: tuple[int, int], left_click=None, right_click=None, mouse_press=None, mouse_unpress=None):
         """
         Initializes a Sprite object.
 
@@ -20,8 +20,8 @@ class Sprite(pygame.sprite.Sprite):
             Any | None: The function to execute when the Sprite is not being clicked.
         """
         super().__init__()
-        self.image: pygame.Surface = image
-        self.rect: pygame.Rect = self.image.get_rect()
+        self.image: Surface = image
+        self.rect = self.image.get_rect()
         self.rect.x = position[0]
         self.rect.y = position[1]
         self.left_click = left_click
@@ -29,24 +29,30 @@ class Sprite(pygame.sprite.Sprite):
         self.mouse_press = mouse_press
         self.mouse_unpress = mouse_unpress
 
-    def check_click(self, pos: tuple[int, int], button: int):
+    def check_click(self, pos: tuple[int, int], button: int) -> bool:
         """
         Check if Sprite was clicked, and execute corresponding function if so.
 
         Params:
             tuple[int, int]: The current mouse position relative to the window.
             int: The mouse button that was clicked.
+        
+        Returns:
+            bool: True iff the button was clicked and a function was executed.
         """
         if self.mouse_unpress:
             self.mouse_unpress()
             
-        buttons = pygame.mouse.get_pressed()
         if button == BUTTON_LEFT:
             if self.left_click is not None and self.rect.collidepoint(pos):
-                self.left_click(buttons)
+                self.left_click()
+                return True
         elif button == BUTTON_RIGHT:
             if self.right_click is not None and self.rect.collidepoint(pos):
-                self.right_click(buttons)
+                self.right_click()
+                return True
+        
+        return False
 
     def check_mouse_press(self, pos: tuple[int, int]):
         """
@@ -56,7 +62,7 @@ class Sprite(pygame.sprite.Sprite):
             tuple[int, int]: The current mouse position relative to the window.
         """
         if self.mouse_press is not None:
-            buttons = pygame.mouse.get_pressed()
+            buttons = mouse.get_pressed()
             if self.rect.collidepoint(pos) and any(buttons):
                 self.mouse_press(buttons)
             elif self.mouse_unpress is not None:

@@ -1,4 +1,4 @@
-from pygame import Surface
+from pygame import Surface, mouse
 
 from const import TILE_SIZE
 from enums import TileStates
@@ -30,16 +30,14 @@ class Tile(Sprite):
         super().__init__(self.surfaces[self.state], sprite_pos,
                          self.left_click, self.right_click, self.mouse_press, self.mouse_unpress)
 
-    def left_click(self, buttons: tuple[bool, bool, bool]):
+    def left_click(self):
         """
         Uncovers the Tile and its surroundings.
-
-        Params:
-            tuple[bool, bool, bool]: A list of mouse buttons that are currently being clicked.
         """
         if not self.game_object.game_over:
+            buttons_pressed = mouse.get_pressed()
             # right mouse button also pressed
-            if buttons[2]:
+            if buttons_pressed[2]:
                 if self.state != TileStates.FLAG:
                     self.game_object.chord(self.position, self.state)
             elif self.state == TileStates.HIDDEN:
@@ -49,16 +47,14 @@ class Tile(Sprite):
                 else:
                     self.game_object.uncover(self.position)
 
-    def right_click(self, buttons: tuple[bool, bool, bool]):
+    def right_click(self):
         """
         Toggles whether or not the Tile is flagged.
-
-        Params:
-            tuple[bool, bool, bool]: A list of mouse buttons that are currently being clicked.
         """
         if not self.game_object.game_over:
+            buttons_pressed = mouse.get_pressed()
             # left mouse button also pressed
-            if buttons[0]:
+            if buttons_pressed[0]:
                 self.game_object.chord(self.position, self.state)
             elif self.state == TileStates.HIDDEN:
                 self.update_state(TileStates.FLAG)

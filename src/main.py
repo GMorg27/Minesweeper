@@ -33,8 +33,8 @@ def startup_menu():
 
     # menu elements
     tk.Label(menu_root, text='Minesweeper', font=title_font).pack(pady=padding)
+    
     difficulty_frame = tk.Frame(menu_root)
-
     difficulty_frame.pack(pady=padding)
     tk.Label(difficulty_frame, text='Select Difficulty', font=subtitle_font).pack()
     difficulty = tk.StringVar(difficulty_frame, value='beginner')
@@ -48,8 +48,12 @@ def startup_menu():
     player_name = tk.StringVar()
     tk.Entry(name_frame, textvariable=player_name, font=body_font, width=15).pack()
     
-    tk.Button(menu_root, text='Start', font=subtitle_font, width=15, height=2, bg='lime',
-              command=lambda: start_game(menu_root, {'difficulty': difficulty.get(), 'name': player_name.get()})).pack(side='bottom', pady=padding*2)
+    button_frame = tk.Frame(menu_root)
+    button_frame.pack(side='bottom', pady=padding*2)
+    tk.Button(button_frame, text='Start', font=subtitle_font, width=15, height=2, bg='lime',
+              command=lambda: start_game(menu_root, {'difficulty': difficulty.get(), 'name': player_name.get()})).pack()
+    tk.Button(button_frame, text='Quit', font=subtitle_font, width=8, height=1, bg='red',
+              command=menu_root.quit).pack(pady=padding)
 
     menu_root.mainloop()
 

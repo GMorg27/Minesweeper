@@ -7,6 +7,7 @@ from const import MARGIN, ROOT_DIR, TILE_SIZE
 from enums import FaceExpressions, TileStates
 from sprite import Sprite
 from tile import Tile
+import utils
 
 
 # game metadata
@@ -36,6 +37,15 @@ BANNER_COLOR = (180, 180, 180)
 BANNER_FONT_SIZE = 25
 BANNER_FONT_COLOR = (255, 0, 0)
 BANNER_FONT_BG = (0, 0, 0)
+WIN_MENU_SIZE = (9*TILE_SIZE, 11*TILE_SIZE)
+WIN_MENU_COLOR = (255, 255, 255, 200)
+WIN_FONT_SIZE_TITLE = 24
+WIN_FONT_SIZE_LG = 18
+WIN_FONT_SIZE_SM = 15
+WIN_FONT_COLOR = (0, 0, 0)
+WIN_BUTTON_SIZE = (60, 25)
+PAD_Y = 5
+CLICK_DARKENING = 50
 
 
 class Game:
@@ -79,6 +89,9 @@ class Game:
         pygame.display.set_icon(icon)
         pygame.font.init()
         self.banner_font = pygame.font.Font(ROOT_DIR + '/assets/fonts/timer.ttf', BANNER_FONT_SIZE)
+        self.win_font_title = pygame.font.Font(ROOT_DIR + '/assets/fonts/courier_new_bd.ttf', WIN_FONT_SIZE_TITLE)
+        self.win_font_lg = pygame.font.Font(ROOT_DIR + '/assets/fonts/helvetica.ttf', WIN_FONT_SIZE_LG)
+        self.win_font_sm = pygame.font.Font(ROOT_DIR + '/assets/fonts/helvetica.ttf', WIN_FONT_SIZE_SM)
         
     def start(self):
         """
@@ -118,7 +131,7 @@ class Game:
         
         # load tile sprites
         tile_group = pygame.sprite.Group()
-        top_left = ((self.screen_width - self.cols*TILE_SIZE)/2, (self.screen_height - BANNER_HEIGHT - self.rows*TILE_SIZE)/2 + BANNER_HEIGHT)
+        top_left = ((self.screen_width - self.cols*TILE_SIZE)/2, (self.screen_height - self.rows*TILE_SIZE + BANNER_HEIGHT)/2)
         for x in range(self.cols):
             self.tiles.append([])
             for y in range(self.rows):
@@ -138,8 +151,35 @@ class Game:
         flag_icon = Sprite(flag_image, (flag_x, flag_y))
         button_x = (self.screen_width - button_size[0]) / 2
         button_y = (BANNER_HEIGHT - button_size[1]) / 2
-        face_button = Button(self.face_surfaces, (button_x, button_y), left_click=self.restart)
-        
+        face_button = Button(self.face_surfaces, (button_x, button_y), self.restart)
+
+        # load win menu
+        win_menu_group = pygame.sprite.Group()
+        top_left = ((self.screen_width - WIN_MENU_SIZE[0])/2, (self.screen_height - WIN_MENU_SIZE[1] + BANNER_HEIGHT)/2)
+        win_menu_rect = pygame.Rect(top_left[0], top_left[1], WIN_MENU_SIZE[0], WIN_MENU_SIZE[1])
+        win_menu_bg = pygame.Surface(pygame.Rect(win_menu_rect).size, pygame.SRCALPHA)
+        pygame.draw.rect(win_menu_bg, WIN_MENU_COLOR, win_menu_bg.get_rect())
+        text_surface = self.win_font_title.render("You won!", False, WIN_FONT_COLOR)
+        win_message_pos = (top_left[0] + (WIN_MENU_SIZE[0] - text_surface.get_width())/2, top_left[1] + PAD_Y)
+        win_message = Sprite(text_surface, win_message_pos)
+        # the height at which to position the time display on win
+        time_disp_pos_y = win_message_pos[1] + text_surface.get_height() + PAD_Y
+
+        button_pos_x = top_left[0] + (WIN_MENU_SIZE[0] - WIN_BUTTON_SIZE[0])/2
+        quit_pos_y = top_left[1] + WIN_MENU_SIZE[1] - WIN_BUTTON_SIZE[1] - PAD_Y
+        quit_button_rect = pygame.Rect(button_pos_x, quit_pos_y, WIN_BUTTON_SIZE[0], WIN_BUTTON_SIZE[1])
+        quit_button_surface = pygame.Surface(pygame.Rect(quit_button_rect).size, pygame.SRCALPHA)
+        quit_button_surface_clicked = pygame.Surface(pygame.Rect(quit_button_rect).size, pygame.SRCALPHA)
+        pygame.draw.rect(quit_button_surface, (255, 0, 0), quit_button_surface.get_rect())
+        pygame.draw.rect(quit_button_surface_clicked, (255 - CLICK_DARKENING, 0, 0), quit_button_surface.get_rect())
+        quit_text = self.win_font_sm.render("Quit", False, WIN_FONT_COLOR)
+        text_position = ((quit_button_rect.width - quit_text.get_width())/2, (quit_button_rect.height - quit_text.get_height())/2)
+        quit_button_surface.blit(quit_text, text_position)
+        quit_button_surface_clicked.blit(quit_text, text_position)
+        quit_button = Button([(quit_button_surface, quit_button_surface_clicked)], (button_pos_x, quit_pos_y), self.do_quit)
+
+        win_menu_group.add(win_message, quit_button)
+
         # game loop
         clock = pygame.time.Clock()
         while not self.quit:
@@ -150,9 +190,17 @@ class Game:
                     self.quit = True
                     break
                 elif event.type == MOUSEBUTTONUP:
-                    for sprite in tile_group:
-                        sprite.check_click(event.pos, event.button)
-                    face_button.check_click(event.pos, event.button)
+                    # prevent multiple sprites from being clicked at the same time
+                    some_clicked = False
+                    if not self.game_over:
+                        for sprite in tile_group:
+                            if sprite.check_click(event.pos, event.button):
+                                some_clicked = True
+                                break
+                    elif not some_clicked and self.face_state == FaceExpressions.WIN:
+                        some_clicked = quit_button.check_click(event.pos, event.button)
+                    if not some_clicked:
+                        some_clicked = face_button.check_click(event.pos, event.button)
 
             if not self.quit:
                 face_button.check_mouse_press(pygame.mouse.get_pos())
@@ -169,14 +217,16 @@ class Game:
                             self.face_state = FaceExpressions.HAPPY
                     else:
                         self.face_state = FaceExpressions.HAPPY
-                    
-                    if any(buttons_pressed):
-                        for sprite in tile_group:
-                            if sprite not in self.to_chord:
-                                sprite.check_mouse_press(pygame.mouse.get_pos())
+                
+                    for sprite in tile_group:
+                        if sprite not in self.to_chord:
+                            sprite.check_mouse_press(pygame.mouse.get_pos())
                     self.to_chord = []
 
-                    self.time += 1.0 / FRAMERATE
+                    if len(self.mines) > 0:
+                        self.time += 1.0 / FRAMERATE
+                else:
+                    quit_button.check_mouse_press(pygame.mouse.get_pos())
 
                 # update banner elements
                 banner_group = pygame.sprite.Group()
@@ -191,11 +241,8 @@ class Game:
                 flag_counter = Sprite(text_surface,
                                       (flag_x + flag_image.get_width(), (BANNER_HEIGHT - BANNER_FONT_SIZE)/2))
                 # timer
-                seconds = int(self.time)
-                minutes_text = str(int(seconds / 60)).rjust(2, '0')
-                seconds_text =  str(seconds % 60).rjust(2, '0')
-                text = minutes_text + ':' + seconds_text
-                text_surface = self.banner_font.render(text, False, BANNER_FONT_COLOR, BANNER_FONT_BG)
+                timer_text = utils.time_to_str(self.time)
+                text_surface = self.banner_font.render(timer_text, False, BANNER_FONT_COLOR, BANNER_FONT_BG)
                 timer = Sprite(text_surface,
                                (self.screen_width - MARGIN*TILE_SIZE - text_surface.get_width(), (BANNER_HEIGHT - BANNER_FONT_SIZE)/2))
                 face_button.state = self.face_state
@@ -205,16 +252,23 @@ class Game:
                 self.screen.fill(BG_COLOR)
                 tile_group.draw(self.screen)
                 banner_group.draw(self.screen)
+                if self.game_over and self.face_state == FaceExpressions.WIN:
+                    self.screen.blit(win_menu_bg, win_menu_rect)
+                    win_menu_group.draw(self.screen)
+
+                    win_menu_dynamic_group = pygame.sprite.Group()
+                    text_surface = self.win_font_lg.render(timer_text, False, WIN_FONT_COLOR)
+                    time_display = Sprite(text_surface,
+                            (top_left[0] + (WIN_MENU_SIZE[0] - text_surface.get_width())/2, time_disp_pos_y))
+                    win_menu_dynamic_group.add(time_display)
+                    win_menu_dynamic_group.draw(self.screen)
                 pygame.display.flip()
             
             clock.tick(FRAMERATE)
-    
-    def restart(self, buttons: tuple[bool, bool, bool]):
+
+    def restart(self):
         """
         Reset game variables and Tiles.
-
-        Params:
-            tuple[bool, bool, bool]: Unused; passed in by face Button.
         """
         self.game_over = False
         self.visited: list[list[bool]] = [[False]*self.rows for y in range(self.cols)]
@@ -369,4 +423,9 @@ class Game:
             self.tiles[pos[0]][pos[1]].reveal()
         for pos in self.flags:
             self.tiles[pos[0]][pos[1]].reveal()
-        
+    
+    def do_quit(self):
+        """
+        Quits the game, exiting the program.
+        """
+        self.quit = True
