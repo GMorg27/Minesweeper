@@ -58,18 +58,22 @@ def startup_menu():
     menu_root.mainloop()
 
 
-def start_game(root, game_info: tuple[str, str]):
+def start_game(root: tk.Tk, game_info: tuple[str, str]):
     """
     Starts the game with information entered via the tkinter window.
 
     Params:
+        tk.Tk: The top level widget representing the main window.
         tuple[str, str]: A tuple containing the game difficulty and player's entered name.
     """
     root.destroy()
     difficulty = game_info['difficulty']
     player_name = game_info['name']
     game = Game(difficulty)
-    game.start()
+    # start game and reopen startup menu again if user chooses to return
+    if game.start():
+        del root, game_info, difficulty, player_name, game
+        startup_menu()
 
 
 if __name__ == '__main__':

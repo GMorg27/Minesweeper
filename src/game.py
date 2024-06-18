@@ -39,11 +39,12 @@ BANNER_FONT_COLOR = (255, 0, 0)
 BANNER_FONT_BG = (0, 0, 0)
 WIN_MENU_SIZE = (9*TILE_SIZE, 11*TILE_SIZE)
 WIN_MENU_COLOR = (255, 255, 255, 200)
-WIN_FONT_SIZE_TITLE = 24
+WIN_FONT_SIZE_TITLE = 22
 WIN_FONT_SIZE_LG = 18
-WIN_FONT_SIZE_SM = 15
+WIN_FONT_SIZE_MD = 15
+WIN_FONT_SIZE_SM = 12
 WIN_FONT_COLOR = (0, 0, 0)
-WIN_BUTTON_SIZE = (60, 25)
+WIN_BUTTON_SIZE = (70, 25)
 PAD_Y = 5
 CLICK_DARKENING = 50
 
@@ -75,7 +76,8 @@ class Game:
         self.to_chord: list[Tile] = []
         self.uncovered_tiles: int = 0
         self.time: float = 0.0
-        self.face_state = FaceExpressions.HAPPY
+        self.face_state: int = FaceExpressions.HAPPY
+        self.reopen_tkinter: bool = False
 
         # initialize pygame window
         if self.cols >= DIFFICULTIES['intermediate']['cols']:
@@ -91,11 +93,15 @@ class Game:
         self.banner_font = pygame.font.Font(ROOT_DIR + '/assets/fonts/timer.ttf', BANNER_FONT_SIZE)
         self.win_font_title = pygame.font.Font(ROOT_DIR + '/assets/fonts/courier_new_bd.ttf', WIN_FONT_SIZE_TITLE)
         self.win_font_lg = pygame.font.Font(ROOT_DIR + '/assets/fonts/helvetica.ttf', WIN_FONT_SIZE_LG)
+        self.win_font_md = pygame.font.Font(ROOT_DIR + '/assets/fonts/helvetica.ttf', WIN_FONT_SIZE_MD)
         self.win_font_sm = pygame.font.Font(ROOT_DIR + '/assets/fonts/helvetica.ttf', WIN_FONT_SIZE_SM)
         
-    def start(self):
+    def start(self) -> bool:
         """
-        Load game elements and execute main loop.
+        Loads game elements and executes main loop.
+
+        Returns:
+            bool: True iff the tkinter menu should be reopened upon quitting.
         """
         # load tile textures from tile_atlas.png
         tile_map = pygame.image.load(ROOT_DIR + '/assets/textures/tile_atlas.png')
@@ -132,6 +138,7 @@ class Game:
         # load tile sprites
         tile_group = pygame.sprite.Group()
         top_left = ((self.screen_width - self.cols*TILE_SIZE)/2, (self.screen_height - self.rows*TILE_SIZE + BANNER_HEIGHT)/2)
+        print(top_left)
         for x in range(self.cols):
             self.tiles.append([])
             for y in range(self.rows):
@@ -155,30 +162,42 @@ class Game:
 
         # load win menu
         win_menu_group = pygame.sprite.Group()
-        top_left = ((self.screen_width - WIN_MENU_SIZE[0])/2, (self.screen_height - WIN_MENU_SIZE[1] + BANNER_HEIGHT)/2)
-        win_menu_rect = pygame.Rect(top_left[0], top_left[1], WIN_MENU_SIZE[0], WIN_MENU_SIZE[1])
+        win_top_left = ((self.screen_width - WIN_MENU_SIZE[0])/2, (self.screen_height - WIN_MENU_SIZE[1] + BANNER_HEIGHT)/2)
+        win_menu_rect = pygame.Rect(win_top_left[0], win_top_left[1], WIN_MENU_SIZE[0], WIN_MENU_SIZE[1])
         win_menu_bg = pygame.Surface(pygame.Rect(win_menu_rect).size, pygame.SRCALPHA)
         pygame.draw.rect(win_menu_bg, WIN_MENU_COLOR, win_menu_bg.get_rect())
         text_surface = self.win_font_title.render("You won!", False, WIN_FONT_COLOR)
-        win_message_pos = (top_left[0] + (WIN_MENU_SIZE[0] - text_surface.get_width())/2, top_left[1] + PAD_Y)
+        win_message_pos = (win_top_left[0] + (WIN_MENU_SIZE[0] - text_surface.get_width())/2, win_top_left[1] + PAD_Y)
         win_message = Sprite(text_surface, win_message_pos)
         # the height at which to position the time display on win
-        time_disp_pos_y = win_message_pos[1] + text_surface.get_height() + PAD_Y
+        time_disp_pos_y = win_message_pos[1] + text_surface.get_height()
 
-        button_pos_x = top_left[0] + (WIN_MENU_SIZE[0] - WIN_BUTTON_SIZE[0])/2
-        quit_pos_y = top_left[1] + WIN_MENU_SIZE[1] - WIN_BUTTON_SIZE[1] - PAD_Y
+        button_pos_x = win_top_left[0] + (WIN_MENU_SIZE[0] - WIN_BUTTON_SIZE[0])/2
+        quit_pos_y = win_top_left[1] + WIN_MENU_SIZE[1] - WIN_BUTTON_SIZE[1] - PAD_Y
         quit_button_rect = pygame.Rect(button_pos_x, quit_pos_y, WIN_BUTTON_SIZE[0], WIN_BUTTON_SIZE[1])
         quit_button_surface = pygame.Surface(pygame.Rect(quit_button_rect).size, pygame.SRCALPHA)
         quit_button_surface_clicked = pygame.Surface(pygame.Rect(quit_button_rect).size, pygame.SRCALPHA)
         pygame.draw.rect(quit_button_surface, (255, 0, 0), quit_button_surface.get_rect())
         pygame.draw.rect(quit_button_surface_clicked, (255 - CLICK_DARKENING, 0, 0), quit_button_surface.get_rect())
-        quit_text = self.win_font_sm.render("Quit", False, WIN_FONT_COLOR)
+        quit_text = self.win_font_md.render("Quit", False, WIN_FONT_COLOR)
         text_position = ((quit_button_rect.width - quit_text.get_width())/2, (quit_button_rect.height - quit_text.get_height())/2)
         quit_button_surface.blit(quit_text, text_position)
         quit_button_surface_clicked.blit(quit_text, text_position)
-        quit_button = Button([(quit_button_surface, quit_button_surface_clicked)], (button_pos_x, quit_pos_y), self.do_quit)
+        quit_button = Button([(quit_button_surface, quit_button_surface_clicked)], (button_pos_x, quit_pos_y), self.exit)
 
-        win_menu_group.add(win_message, quit_button)
+        return_pos_y = win_top_left[1] + WIN_MENU_SIZE[1] - 2*(WIN_BUTTON_SIZE[1] + PAD_Y)
+        return_button_rect = pygame.Rect(button_pos_x, return_pos_y, WIN_BUTTON_SIZE[0], WIN_BUTTON_SIZE[1])
+        return_button_surface = pygame.Surface(pygame.Rect(return_button_rect).size, pygame.SRCALPHA)
+        return_button_surface_clicked = pygame.Surface(pygame.Rect(return_button_rect).size, pygame.SRCALPHA)
+        pygame.draw.rect(return_button_surface, (0, 255, 0), return_button_surface.get_rect())
+        pygame.draw.rect(return_button_surface_clicked, (0, 255 - CLICK_DARKENING, 0), return_button_surface.get_rect())
+        return_text = self.win_font_sm.render("Main Menu", False, WIN_FONT_COLOR)
+        text_position = ((return_button_rect.width - return_text.get_width())/2, (return_button_rect.height - return_text.get_height())/2)
+        return_button_surface.blit(return_text, text_position)
+        return_button_surface_clicked.blit(return_text, text_position)
+        return_button = Button([(return_button_surface, return_button_surface_clicked)], (button_pos_x, return_pos_y), self.quit_to_menu)
+
+        win_menu_group.add(win_message, quit_button, return_button)
 
         # game loop
         clock = pygame.time.Clock()
@@ -198,9 +217,9 @@ class Game:
                                 some_clicked = True
                                 break
                     elif not some_clicked and self.face_state == FaceExpressions.WIN:
-                        some_clicked = quit_button.check_click(event.pos, event.button)
+                        some_clicked = quit_button.check_click(event.pos, event.button) or return_button.check_click(event.pos, event.button)
                     if not some_clicked:
-                        some_clicked = face_button.check_click(event.pos, event.button)
+                        face_button.check_click(event.pos, event.button)
 
             if not self.quit:
                 face_button.check_mouse_press(pygame.mouse.get_pos())
@@ -227,6 +246,7 @@ class Game:
                         self.time += 1.0 / FRAMERATE
                 else:
                     quit_button.check_mouse_press(pygame.mouse.get_pos())
+                    return_button.check_mouse_press(pygame.mouse.get_pos())
 
                 # update banner elements
                 banner_group = pygame.sprite.Group()
@@ -259,16 +279,19 @@ class Game:
                     win_menu_dynamic_group = pygame.sprite.Group()
                     text_surface = self.win_font_lg.render(timer_text, False, WIN_FONT_COLOR)
                     time_display = Sprite(text_surface,
-                            (top_left[0] + (WIN_MENU_SIZE[0] - text_surface.get_width())/2, time_disp_pos_y))
+                            (win_top_left[0] + (WIN_MENU_SIZE[0] - text_surface.get_width())/2, time_disp_pos_y))
                     win_menu_dynamic_group.add(time_display)
                     win_menu_dynamic_group.draw(self.screen)
                 pygame.display.flip()
             
             clock.tick(FRAMERATE)
+        
+        pygame.quit()
+        return self.reopen_tkinter
 
     def restart(self):
         """
-        Reset game variables and Tiles.
+        Resets game variables and Tiles.
         """
         self.game_over = False
         self.visited: list[list[bool]] = [[False]*self.rows for y in range(self.cols)]
@@ -289,14 +312,17 @@ class Game:
         Params:
             tuple[int, int]: The position (x, y) within the field of the clicked Tile.
         """
+        open_tiles = []
+        for x in range(self.cols):
+            for y in range(self.rows):
+                if (x, y) != click_pos:
+                    open_tiles.append((x, y))
         for i in range(self.num_mines):
-            while True:
-                rand_row = random.randint(0, self.rows - 1)
-                rand_col = random.randint(0, self.cols - 1)
-                if (rand_col, rand_row) != click_pos and not self.tiles[rand_col][rand_row].is_mine:
-                    self.tiles[rand_col][rand_row].is_mine = True
-                    self.mines.append((rand_col, rand_row))
-                    break
+            rand_index = random.randint(0, len(open_tiles) - 1)
+            tile_pos = open_tiles[rand_index]
+            self.tiles[tile_pos[0]][tile_pos[1]].is_mine = True
+            self.mines.append((tile_pos[0], tile_pos[1]))
+            del open_tiles[rand_index]
 
     def uncover(self, click_pos: tuple[int, int]):
         """
@@ -373,7 +399,7 @@ class Game:
 
     def chord(self, click_pos: tuple[int, int], num_flags: int):
         """
-        If the correct number of adjacent Tiles has been flagged, uncover all adjacent hidden Tiles.
+        If the correct number of adjacent Tiles has been flagged, uncovers all adjacent hidden Tiles.
 
         Params:
             tuple[int, int]: The position (x, y) within the field of the center Tile.
@@ -395,7 +421,7 @@ class Game:
     
     def press_chord(self, click_pos: tuple[int, int], num_flags: int):
         """
-        Display the pressed texture for all Tiles that would be uncovered with a chord.
+        Displays the pressed texture for all Tiles that would be uncovered with a chord.
 
         Params:
             tuple[int, int]: The position (x, y) within the field of the center Tile.
@@ -424,8 +450,15 @@ class Game:
         for pos in self.flags:
             self.tiles[pos[0]][pos[1]].reveal()
     
-    def do_quit(self):
+    def exit(self):
         """
-        Quits the game, exiting the program.
+        Quits the game and exits the program.
         """
         self.quit = True
+
+    def quit_to_menu(self):
+        """
+        Quits the game and reopens the tkinter main menu.
+        """
+        self.quit = True
+        self.reopen_tkinter = True
