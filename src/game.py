@@ -89,12 +89,19 @@ class Game:
         pygame.display.set_caption('Minesweeper')
         icon = pygame.image.load(ROOT_DIR + '/assets/textures/mine.png')
         pygame.display.set_icon(icon)
+
         pygame.font.init()
         self.banner_font = pygame.font.Font(ROOT_DIR + '/assets/fonts/timer.ttf', BANNER_FONT_SIZE)
         self.win_font_title = pygame.font.Font(ROOT_DIR + '/assets/fonts/courier_new_bd.ttf', WIN_FONT_SIZE_TITLE)
         self.win_font_lg = pygame.font.Font(ROOT_DIR + '/assets/fonts/helvetica.ttf', WIN_FONT_SIZE_LG)
         self.win_font_md = pygame.font.Font(ROOT_DIR + '/assets/fonts/helvetica.ttf', WIN_FONT_SIZE_MD)
         self.win_font_sm = pygame.font.Font(ROOT_DIR + '/assets/fonts/helvetica.ttf', WIN_FONT_SIZE_SM)
+
+        pygame.mixer.init()
+        self.explosion_sound = pygame.mixer.Sound(ROOT_DIR + '/assets/sounds/explosion.mp3')
+        self.flag_sound = pygame.mixer.Sound(ROOT_DIR + '/assets/sounds/flag_place.mp3')
+        self.click_sound = pygame.mixer.Sound(ROOT_DIR + '/assets/sounds/tile_click.mp3')
+        self.victory_sound = pygame.mixer.Sound(ROOT_DIR + '/assets/sounds/victory.mp3')
         
     def start(self) -> bool:
         """
@@ -138,7 +145,6 @@ class Game:
         # load tile sprites
         tile_group = pygame.sprite.Group()
         top_left = ((self.screen_width - self.cols*TILE_SIZE)/2, (self.screen_height - self.rows*TILE_SIZE + BANNER_HEIGHT)/2)
-        print(top_left)
         for x in range(self.cols):
             self.tiles.append([])
             for y in range(self.rows):
@@ -409,6 +415,7 @@ class Game:
         self.to_chord = chord_info[1]
 
         if chord_info[0]:
+            self.click_sound.play()
             for tile in self.to_chord:
                 if tile.is_mine:
                     tile.update_state(TileStates.MINE_HIT)
@@ -438,6 +445,7 @@ class Game:
         """
         self.game_over = True
         self.face_state = FaceExpressions.WIN
+        self.victory_sound.play()
 
     def loss(self):
         """
@@ -445,6 +453,7 @@ class Game:
         """
         self.game_over = True
         self.face_state = FaceExpressions.LOSE
+        self.explosion_sound.play()
         for pos in self.mines:
             self.tiles[pos[0]][pos[1]].reveal()
         for pos in self.flags:

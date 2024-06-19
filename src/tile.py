@@ -45,6 +45,7 @@ class Tile(Sprite):
                     self.update_state(TileStates.MINE_HIT)
                     self.game_object.loss()
                 else:
+                    self.game_object.click_sound.play()
                     self.game_object.uncover(self.position)
 
     def right_click(self):
@@ -55,10 +56,12 @@ class Tile(Sprite):
             buttons_pressed = mouse.get_pressed()
             # left mouse button also pressed
             if buttons_pressed[0]:
-                self.game_object.chord(self.position, self.state)
+                if self.state != TileStates.FLAG:
+                    self.game_object.chord(self.position, self.state)
             elif self.state == TileStates.HIDDEN:
                 self.update_state(TileStates.FLAG)
                 self.game_object.flags.append(self.position)
+                self.game_object.flag_sound.play()
             elif self.state == TileStates.FLAG:
                 self.update_state(TileStates.HIDDEN)
                 self.game_object.flags.remove(self.position)
