@@ -39,10 +39,10 @@ BANNER_FONT_COLOR = (255, 0, 0)
 BANNER_FONT_BG = (0, 0, 0)
 WIN_MENU_SIZE = (9*TILE_SIZE, 11*TILE_SIZE)
 WIN_MENU_COLOR = (255, 255, 255, 200)
-WIN_FONT_SIZE_TITLE = 22
-WIN_FONT_SIZE_LG = 18
-WIN_FONT_SIZE_MD = 15
-WIN_FONT_SIZE_SM = 12
+WIN_FONT_SIZE_TITLE = 25
+WIN_FONT_SIZE_LG = 20
+WIN_FONT_SIZE_MD = 18
+WIN_FONT_SIZE_SM = 15
 WIN_FONT_COLOR = (0, 0, 0)
 WIN_BUTTON_SIZE = (70, 25)
 PAD_Y = 5
@@ -78,13 +78,14 @@ class Game:
         self.time: float = 0.0
         self.face_state: int = FaceExpressions.HAPPY
         self.reopen_tkinter: bool = False
+        self.sound: bool = True
 
         # initialize pygame window
         if self.cols >= DIFFICULTIES['intermediate']['cols']:
             self.screen_width = TILE_SIZE * (self.cols + 2*MARGIN)
         else:
             self.screen_width = TILE_SIZE * (DIFFICULTIES['intermediate']['cols'] + 2*MARGIN)
-        self.screen_height = TILE_SIZE * (self.rows + 2*MARGIN) + BANNER_HEIGHT
+        self.screen_height = TILE_SIZE * (self.rows + 2*MARGIN) + 2*BANNER_HEIGHT
         self.screen = pygame.display.set_mode((self.screen_width, self.screen_height))
         pygame.display.set_caption('Minesweeper')
         icon = pygame.image.load(ROOT_DIR + '/assets/textures/mine.png')
@@ -144,7 +145,7 @@ class Game:
         
         # load tile sprites
         tile_group = pygame.sprite.Group()
-        top_left = ((self.screen_width - self.cols*TILE_SIZE)/2, (self.screen_height - self.rows*TILE_SIZE + BANNER_HEIGHT)/2)
+        top_left = ((self.screen_width - self.cols*TILE_SIZE)/2, (self.screen_height - self.rows*TILE_SIZE)/2)
         for x in range(self.cols):
             self.tiles.append([])
             for y in range(self.rows):
@@ -156,7 +157,7 @@ class Game:
         banner_group = pygame.sprite.Group()
         banner_image = pygame.Surface((self.screen_width, BANNER_HEIGHT))
         banner_image.fill(BANNER_COLOR)
-        banner = Sprite(banner_image, (0, 0))
+        banner_bottom = Sprite(banner_image, (0, self.screen_height - BANNER_HEIGHT))
         flag_image = pygame.image.load(ROOT_DIR + '/assets/textures/flag.png')
         flag_image = pygame.transform.scale(flag_image, (2*TILE_SIZE, 2*TILE_SIZE))
         flag_x = MARGIN * TILE_SIZE
@@ -166,9 +167,31 @@ class Game:
         button_y = (BANNER_HEIGHT - button_size[1]) / 2
         face_button = Button(self.face_surfaces, (button_x, button_y), self.restart)
 
+        # load bottom banner
+        banner_top = Sprite(banner_image, (0, 0))
+        home_image = pygame.image.load(ROOT_DIR + '/assets/textures/home.png')
+        home_image_clicked = pygame.image.load(ROOT_DIR + '/assets/textures/home_clicked.png')
+        button_x = (self.screen_width - home_image.get_width()) / 2
+        button_y = (self.screen_height - (BANNER_HEIGHT + home_image.get_height())/2)
+        home_button = Button([(home_image, home_image_clicked)], (button_x, button_y), self.quit_to_menu)
+        quit_image = pygame.image.load(ROOT_DIR + '/assets/textures/quit.png')
+        quit_image_clicked = pygame.image.load(ROOT_DIR + '/assets/textures/quit_clicked.png')
+        button_x = (self.screen_width - quit_image.get_width()) / 2 - home_image.get_width()*2
+        button_y = (self.screen_height - (BANNER_HEIGHT + quit_image.get_height())/2)
+        quit_button = Button([(quit_image, quit_image_clicked)], (button_x, button_y), self.exit)
+        sound_image = pygame.image.load(ROOT_DIR + '/assets/textures/sound_on.png')
+        sound_image_clicked = pygame.image.load(ROOT_DIR + '/assets/textures/sound_on_clicked.png')
+        mute_image = pygame.image.load(ROOT_DIR + '/assets/textures/sound_mute.png')
+        mute_image_clicked = pygame.image.load(ROOT_DIR + '/assets/textures/sound_mute_clicked.png')
+        button_x = (self.screen_width - sound_image.get_width()) / 2 + home_image.get_width()*2
+        button_y = (self.screen_height - (BANNER_HEIGHT + sound_image.get_height())/2)
+        sound_button = Button([(mute_image, mute_image_clicked), (sound_image, sound_image_clicked)],
+                              (button_x, button_y), self.toggle_sound)
+        sound_button.state = self.sound
+
         # load win menu
         win_menu_group = pygame.sprite.Group()
-        win_top_left = ((self.screen_width - WIN_MENU_SIZE[0])/2, (self.screen_height - WIN_MENU_SIZE[1] + BANNER_HEIGHT)/2)
+        win_top_left = ((self.screen_width - WIN_MENU_SIZE[0])/2, (self.screen_height - WIN_MENU_SIZE[1])/2)
         win_menu_rect = pygame.Rect(win_top_left[0], win_top_left[1], WIN_MENU_SIZE[0], WIN_MENU_SIZE[1])
         win_menu_bg = pygame.Surface(pygame.Rect(win_menu_rect).size, pygame.SRCALPHA)
         pygame.draw.rect(win_menu_bg, WIN_MENU_COLOR, win_menu_bg.get_rect())
@@ -178,32 +201,7 @@ class Game:
         # the height at which to position the time display on win
         time_disp_pos_y = win_message_pos[1] + text_surface.get_height()
 
-        button_pos_x = win_top_left[0] + (WIN_MENU_SIZE[0] - WIN_BUTTON_SIZE[0])/2
-        quit_pos_y = win_top_left[1] + WIN_MENU_SIZE[1] - WIN_BUTTON_SIZE[1] - PAD_Y
-        quit_button_rect = pygame.Rect(button_pos_x, quit_pos_y, WIN_BUTTON_SIZE[0], WIN_BUTTON_SIZE[1])
-        quit_button_surface = pygame.Surface(pygame.Rect(quit_button_rect).size, pygame.SRCALPHA)
-        quit_button_surface_clicked = pygame.Surface(pygame.Rect(quit_button_rect).size, pygame.SRCALPHA)
-        pygame.draw.rect(quit_button_surface, (255, 0, 0), quit_button_surface.get_rect())
-        pygame.draw.rect(quit_button_surface_clicked, (255 - CLICK_DARKENING, 0, 0), quit_button_surface.get_rect())
-        quit_text = self.win_font_md.render("Quit", False, WIN_FONT_COLOR)
-        text_position = ((quit_button_rect.width - quit_text.get_width())/2, (quit_button_rect.height - quit_text.get_height())/2)
-        quit_button_surface.blit(quit_text, text_position)
-        quit_button_surface_clicked.blit(quit_text, text_position)
-        quit_button = Button([(quit_button_surface, quit_button_surface_clicked)], (button_pos_x, quit_pos_y), self.exit)
-
-        return_pos_y = win_top_left[1] + WIN_MENU_SIZE[1] - 2*(WIN_BUTTON_SIZE[1] + PAD_Y)
-        return_button_rect = pygame.Rect(button_pos_x, return_pos_y, WIN_BUTTON_SIZE[0], WIN_BUTTON_SIZE[1])
-        return_button_surface = pygame.Surface(pygame.Rect(return_button_rect).size, pygame.SRCALPHA)
-        return_button_surface_clicked = pygame.Surface(pygame.Rect(return_button_rect).size, pygame.SRCALPHA)
-        pygame.draw.rect(return_button_surface, (0, 255, 0), return_button_surface.get_rect())
-        pygame.draw.rect(return_button_surface_clicked, (0, 255 - CLICK_DARKENING, 0), return_button_surface.get_rect())
-        return_text = self.win_font_sm.render("Main Menu", False, WIN_FONT_COLOR)
-        text_position = ((return_button_rect.width - return_text.get_width())/2, (return_button_rect.height - return_text.get_height())/2)
-        return_button_surface.blit(return_text, text_position)
-        return_button_surface_clicked.blit(return_text, text_position)
-        return_button = Button([(return_button_surface, return_button_surface_clicked)], (button_pos_x, return_pos_y), self.quit_to_menu)
-
-        win_menu_group.add(win_message, quit_button, return_button)
+        win_menu_group.add(win_message)
 
         # game loop
         clock = pygame.time.Clock()
@@ -216,18 +214,20 @@ class Game:
                     break
                 elif event.type == MOUSEBUTTONUP:
                     # prevent multiple sprites from being clicked at the same time
-                    some_clicked = False
+                    quit_button.check_click(event.pos, event.button)
+                    home_button.check_click(event.pos, event.button)
+                    sound_button.check_click(event.pos, event.button)
+                    face_button.check_click(event.pos, event.button)
                     if not self.game_over:
                         for sprite in tile_group:
                             if sprite.check_click(event.pos, event.button):
-                                some_clicked = True
                                 break
-                    elif not some_clicked and self.face_state == FaceExpressions.WIN:
-                        some_clicked = quit_button.check_click(event.pos, event.button) or return_button.check_click(event.pos, event.button)
-                    if not some_clicked:
-                        face_button.check_click(event.pos, event.button)
 
             if not self.quit:
+                sound_button.state = self.sound
+                quit_button.check_mouse_press(pygame.mouse.get_pos())
+                home_button.check_mouse_press(pygame.mouse.get_pos())
+                sound_button.check_mouse_press(pygame.mouse.get_pos())
                 face_button.check_mouse_press(pygame.mouse.get_pos())
 
                 if not self.game_over:
@@ -250,9 +250,6 @@ class Game:
 
                     if len(self.mines) > 0:
                         self.time += 1.0 / FRAMERATE
-                else:
-                    quit_button.check_mouse_press(pygame.mouse.get_pos())
-                    return_button.check_mouse_press(pygame.mouse.get_pos())
 
                 # update banner elements
                 banner_group = pygame.sprite.Group()
@@ -272,7 +269,7 @@ class Game:
                 timer = Sprite(text_surface,
                                (self.screen_width - MARGIN*TILE_SIZE - text_surface.get_width(), (BANNER_HEIGHT - BANNER_FONT_SIZE)/2))
                 face_button.state = self.face_state
-                banner_group.add(banner, flag_icon, flag_counter, timer, face_button)
+                banner_group.add(banner_top, banner_bottom, flag_icon, flag_counter, timer, face_button, quit_button, home_button, sound_button)
 
                 # render game elements
                 self.screen.fill(BG_COLOR)
@@ -415,7 +412,8 @@ class Game:
         self.to_chord = chord_info[1]
 
         if chord_info[0]:
-            self.click_sound.play()
+            if self.sound:
+                self.click_sound.play()
             for tile in self.to_chord:
                 if tile.is_mine:
                     tile.update_state(TileStates.MINE_HIT)
@@ -445,7 +443,8 @@ class Game:
         """
         self.game_over = True
         self.face_state = FaceExpressions.WIN
-        self.victory_sound.play()
+        if self.sound:
+            self.victory_sound.play()
 
     def loss(self):
         """
@@ -453,7 +452,8 @@ class Game:
         """
         self.game_over = True
         self.face_state = FaceExpressions.LOSE
-        self.explosion_sound.play()
+        if self.sound:
+            self.explosion_sound.play()
         for pos in self.mines:
             self.tiles[pos[0]][pos[1]].reveal()
         for pos in self.flags:
@@ -471,3 +471,9 @@ class Game:
         """
         self.quit = True
         self.reopen_tkinter = True
+
+    def toggle_sound(self):
+        """
+        Enables/disables sound.
+        """
+        self.sound = not self.sound
