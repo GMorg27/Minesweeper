@@ -1,7 +1,8 @@
 Minesweeper by Geoffrey Morgan
 
 BUILD INSTRUCTIONS
-pip install pygame
+pip install -r requirements.txt
+Python 3.7+ required.
 
 ATTRIBUTIONS
 home.png: https://www.flaticon.com/free-icons/home-button

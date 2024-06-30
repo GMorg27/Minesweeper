@@ -1,1 +1,4 @@
+src/__pycache__/*
 *.svg
+highscores.txt
+settings.txt

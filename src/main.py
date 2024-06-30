@@ -7,6 +7,7 @@ from game import Game
 
 TK_WIDTH = 400
 TK_HEIGHT = 400
+MAX_NAME_LENGTH = 6
 
 game = Game()
 
@@ -48,7 +49,8 @@ def startup_menu():
     name_frame.pack(pady=padding)
     tk.Label(name_frame, text='Name', font=subtitle_font).pack()
     player_name = tk.StringVar()
-    tk.Entry(name_frame, textvariable=player_name, font=body_font, width=15).pack()
+    reg = menu_root.register(validate_name) 
+    tk.Entry(name_frame, textvariable=player_name, font=body_font, width=15, validate="key", validatecommand=(reg, '%P')).pack()
     
     button_frame = tk.Frame(menu_root)
     button_frame.pack(side='bottom', pady=padding*2)
@@ -58,6 +60,19 @@ def startup_menu():
               command=menu_root.quit).pack(pady=padding)
 
     menu_root.mainloop()
+
+
+def validate_name(input: str) -> bool:
+    """
+    Validates the name Entry field to ensure it does not exceed maximum length.
+
+    Params:
+        str: Input text of tkinter Entry.
+    
+    Returns:
+        bool: True iff the input does not exceed MAX_NAME_LENGTH characters.
+    """
+    return len(input) <= MAX_NAME_LENGTH
 
 
 def start_game(root: tk.Tk, game_info: tuple[str, str]):
@@ -71,7 +86,7 @@ def start_game(root: tk.Tk, game_info: tuple[str, str]):
     root.withdraw() # temporarily close the tkinter window
     difficulty = game_info['difficulty']
     player_name = game_info['name']
-    if game.start(difficulty):
+    if game.start(difficulty, player_name):
         root.deiconify() # reopen the tkinter window
     else:
         root.destroy() # quit tkinter

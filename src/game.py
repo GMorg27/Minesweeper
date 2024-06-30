@@ -4,6 +4,7 @@ import random
 
 from button import Button
 from const import DIFFICULTIES, FRAMERATE, MARGIN, ROOT_DIR, TILE_SIZE
+from data import Data
 from enums import FaceExpressions, TileStates
 from sprite import Sprite
 from tile import Tile
@@ -21,8 +22,8 @@ WIN_SCREEN_SIZE = (9*TILE_SIZE, 11*TILE_SIZE)
 WIN_SCREEN_COLOR = (255, 255, 255, 200)
 WIN_FONT_SIZE_TITLE = 25
 WIN_FONT_SIZE_LG = 20
-WIN_FONT_SIZE_MD = 18
-WIN_FONT_SIZE_SM = 15
+WIN_FONT_SIZE_MD = 12
+WIN_FONT_SIZE_SM = 10
 WIN_FONT_COLOR = (0, 0, 0)
 WIN_PAD_Y = 5
 
@@ -31,6 +32,7 @@ class Game():
     """
     A class that handles the pygame display and all game events.
     """
+    difficulty: str
     screen: pygame.Surface
     face_button: Button
     sound_button: Button
@@ -41,6 +43,8 @@ class Game():
         """
         Initializes a Game object and loads all assets.
         """
+        self.player_name: str = ''
+
         # game variables
         self.game_over: bool = False
         self.num_mines: int = 0
@@ -59,12 +63,16 @@ class Game():
         self.screen_height: int = 0
         self.quitting: bool = False
         self.reopen_tkinter: bool = False
-        self.sound_enabled: bool = True
         self.field_top_left: tuple[int, int] = (0, 0)
         self.banner_sprites: list[Sprite] = []
         self.footer_sprites: list[Sprite] = []
         self.win_screen_sprites: list[Sprite] = []
         self.buttons: list[Button] = []
+
+        # file input/output
+        self.file_io: Data = Data()
+        settings = self.file_io.get_settings()
+        self.sound_enabled: bool = settings['sound_enabled']
 
         self.icon = pygame.image.load(ROOT_DIR + '/assets/textures/mine.png')
         self.tile_map = pygame.image.load(ROOT_DIR + '/assets/textures/tile_atlas.png')
@@ -103,9 +111,10 @@ class Game():
         self.reopen_tkinter = False
 
         # configure difficulty specifications
-        difficulty_data = DIFFICULTIES['beginner']
+        self.difficulty = 'beginner'
         if difficulty in DIFFICULTIES.keys():
-            difficulty_data = DIFFICULTIES[difficulty]
+            self.difficulty = difficulty
+        difficulty_data = DIFFICULTIES[self.difficulty]
         self.num_mines = difficulty_data['num_mines']
         self.rows = difficulty_data['rows']
         self.cols = difficulty_data['cols']
@@ -218,16 +227,18 @@ class Game():
                 self.tiles[x][y].update_state(TileStates.HIDDEN)
                 self.tiles[x][y].is_mine = False
 
-    def start(self, difficulty: str = 'beginner') -> bool:
+    def start(self, difficulty: str = 'beginner', name: str = '') -> bool:
         """
         Loads Game elements and executes the main loop that handles all events.
 
         Params:
             str: The game difficulty ('beginner', 'intermediate', or 'expert').
+            str: The player name to be used in high scores.
         
         Returns:
             bool: True iff the tkinter startup menu should be reopened upon quitting.
         """
+        self.player_name = name
         self.load(difficulty)
         self.restart()
 
@@ -239,6 +250,7 @@ class Game():
                     self.game_over = True
                     self.quitting = True
                     pygame.quit()
+                    self.save_settings()
                     break
                 elif event.type == MOUSEBUTTONUP:
                     for button in self.buttons:
@@ -314,7 +326,12 @@ class Game():
             pos_x = self.win_screen_rect.x + (WIN_SCREEN_SIZE[0] - text_surface.get_width())/2
             pos_y = self.win_screen_sprites[0].rect.y + self.win_screen_sprites[0].rect.height
             time_display = Sprite(text_surface, (pos_x, pos_y))
-            win_screen_group.add(time_display)
+            text = f'%s High Scores' % self.difficulty.capitalize()
+            text_surface = self.win_font_md.render(text, False, WIN_FONT_COLOR)
+            pos_x = self.win_screen_rect.x + (WIN_SCREEN_SIZE[0] - text_surface.get_width())/2
+            pos_y += time_display.rect.height + WIN_PAD_Y
+            high_score_title = Sprite(text_surface, (pos_x, pos_y))
+            win_screen_group.add(time_display, high_score_title)
             win_screen_group.draw(self.screen)
         
         pygame.display.flip()
@@ -543,12 +560,13 @@ class Game():
 
     def win(self):
         """
-        Ends the game and updates the face Button to signify a win.
+        Ends the game, saves the time to ../data/highscores.txt, and updates the face Button to signify a win.
         """
         self.game_over = True
         self.face_button.state = FaceExpressions.WIN
         if self.sound_enabled:
             self.victory_sound.play()
+        print(self.file_io.add_score(self.time, self.difficulty, self.player_name))
 
     def loss(self):
         """
@@ -570,6 +588,7 @@ class Game():
         Signifies that the program should exit without reopening the tkinter startup menu.
         """
         self.quitting = True
+        self.save_settings()
     
     def quit_to_menu(self):
         """
@@ -577,6 +596,7 @@ class Game():
         """
         self.quitting = True
         self.reopen_tkinter = True
+        self.save_settings()
     
     def toggle_sound(self):
         """
@@ -584,3 +604,11 @@ class Game():
         """
         self.sound_enabled = not self.sound_enabled
     
+    def save_settings(self):
+        """
+        Uses the Data class to write settings data to ../data/settings.txt.
+        """
+        data = {
+            'sound_enabled': self.sound_enabled
+        }
+        self.file_io.write_settings(data)
