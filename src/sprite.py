@@ -38,32 +38,36 @@ class Sprite(sprite.Sprite):
             int: The mouse button that was clicked.
         
         Returns:
-            bool: True iff the button was clicked and a function was executed.
+            bool: True iff the Sprite was clicked.
         """
         if self.mouse_unpress:
             self.mouse_unpress()
-            
-        if button == BUTTON_LEFT:
-            if self.left_click is not None and self.rect.collidepoint(pos):
+        
+        if self.rect.collidepoint(pos):
+            if button == BUTTON_LEFT and self.left_click is not None:
                 self.left_click()
-                return True
-        elif button == BUTTON_RIGHT:
-            if self.right_click is not None and self.rect.collidepoint(pos):
+            elif button == BUTTON_RIGHT and self.right_click is not None:
                 self.right_click()
-                return True
+            return True
         
         return False
 
-    def check_mouse_press(self, pos: tuple[int, int]):
+    def check_mouse_press(self, pos: tuple[int, int]) -> bool:
         """
         Check whether the Sprite is currently being clicked, and execute the corresponding function.
 
         Params:
             tuple[int, int]: The current mouse position relative to the window.
+        
+        Returns:
+            bool: True iff the Sprite is currently being clicked.
         """
-        if self.mouse_press is not None:
-            buttons = mouse.get_pressed()
-            if self.rect.collidepoint(pos) and any(buttons):
+        buttons = mouse.get_pressed()
+        if self.rect.collidepoint(pos) and buttons[0]:
+            if self.mouse_press is not None:
                 self.mouse_press(buttons)
-            elif self.mouse_unpress is not None:
-                self.mouse_unpress()
+            return True
+        elif self.mouse_unpress is not None:
+            self.mouse_unpress()
+        
+        return False     

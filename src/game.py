@@ -3,32 +3,12 @@ from pygame.locals import *
 import random
 
 from button import Button
-from const import MARGIN, ROOT_DIR, TILE_SIZE
+from const import DIFFICULTIES, FRAMERATE, MARGIN, ROOT_DIR, TILE_SIZE
 from enums import FaceExpressions, TileStates
 from sprite import Sprite
 from tile import Tile
-import utils
+from utils import time_to_str
 
-
-# game metadata
-DIFFICULTIES = {
-    'beginner': {
-        'num_mines': 10,
-        'rows': 9,
-        'cols': 9
-    },
-    'intermediate': {
-        'num_mines': 40,
-        'rows': 16,
-        'cols': 16
-    },
-    'expert': {
-        'num_mines': 99,
-        'rows': 16,
-        'cols': 30
-    }
-}
-FRAMERATE = 30
 
 # pygame window specifications
 BG_COLOR = (200, 200, 200)
@@ -37,59 +17,67 @@ BANNER_COLOR = (180, 180, 180)
 BANNER_FONT_SIZE = 25
 BANNER_FONT_COLOR = (255, 0, 0)
 BANNER_FONT_BG = (0, 0, 0)
-WIN_MENU_SIZE = (9*TILE_SIZE, 11*TILE_SIZE)
-WIN_MENU_COLOR = (255, 255, 255, 200)
+WIN_SCREEN_SIZE = (9*TILE_SIZE, 11*TILE_SIZE)
+WIN_SCREEN_COLOR = (255, 255, 255, 200)
 WIN_FONT_SIZE_TITLE = 25
 WIN_FONT_SIZE_LG = 20
 WIN_FONT_SIZE_MD = 18
 WIN_FONT_SIZE_SM = 15
 WIN_FONT_COLOR = (0, 0, 0)
-WIN_BUTTON_SIZE = (70, 25)
-PAD_Y = 5
-CLICK_DARKENING = 50
+WIN_PAD_Y = 5
 
 
-class Game:
+class Game():
     """
-    A class to handle the pygame window and all game events.
+    A class that handles the pygame display and all game events.
     """
+    screen: pygame.Surface
+    face_button: Button
+    sound_button: Button
+    win_screen_bg: pygame.Surface
+    win_screen_rect: pygame.Rect
 
-    def __init__(self, difficulty: str):
+    def __init__(self):
         """
-        Initializes a Game object and the pygame window.
-
-        Params:
-            str: The game difficulty.
+        Initializes a Game object and loads all assets.
         """
-        difficulty_data = DIFFICULTIES[difficulty]
+        # game variables
         self.game_over: bool = False
-        self.quit: bool = False
-        self.num_mines: int = difficulty_data['num_mines']
-        self.rows: int = difficulty_data['rows']
-        self.cols: int = difficulty_data['cols']
+        self.num_mines: int = 0
+        self.rows: int = 0
+        self.cols: int = 0
         self.tiles: list[list[Tile]] = []
-        self.visited: list[list[bool]] = [[False]*self.rows for y in range(self.cols)]
-        self.tile_surfaces: list[pygame.Surface] = []
-        self.face_surfaces: list[pygame.Surface] = []
+        self.visited: list[list[bool]] = []
         self.mines: list[tuple[int, int]] = []
         self.flags: list[tuple[int, int]] = []
         self.to_chord: list[Tile] = []
         self.uncovered_tiles: int = 0
         self.time: float = 0.0
-        self.face_state: int = FaceExpressions.HAPPY
-        self.reopen_tkinter: bool = False
-        self.sound: bool = True
 
-        # initialize pygame window
-        if self.cols >= DIFFICULTIES['intermediate']['cols']:
-            self.screen_width = TILE_SIZE * (self.cols + 2*MARGIN)
-        else:
-            self.screen_width = TILE_SIZE * (DIFFICULTIES['intermediate']['cols'] + 2*MARGIN)
-        self.screen_height = TILE_SIZE * (self.rows + 2*MARGIN) + 2*BANNER_HEIGHT
-        self.screen = pygame.display.set_mode((self.screen_width, self.screen_height))
-        pygame.display.set_caption('Minesweeper')
-        icon = pygame.image.load(ROOT_DIR + '/assets/textures/mine.png')
-        pygame.display.set_icon(icon)
+        # window variables
+        self.screen_width: int = 0
+        self.screen_height: int = 0
+        self.quitting: bool = False
+        self.reopen_tkinter: bool = False
+        self.sound_enabled: bool = True
+        self.field_top_left: tuple[int, int] = (0, 0)
+        self.banner_sprites: list[Sprite] = []
+        self.footer_sprites: list[Sprite] = []
+        self.win_screen_sprites: list[Sprite] = []
+        self.buttons: list[Button] = []
+
+        self.icon = pygame.image.load(ROOT_DIR + '/assets/textures/mine.png')
+        self.tile_map = pygame.image.load(ROOT_DIR + '/assets/textures/tile_atlas.png')
+        self.face_map = pygame.image.load(ROOT_DIR + '/assets/textures/face_atlas.png')
+        self.flag_image = pygame.image.load(ROOT_DIR + '/assets/textures/flag.png')
+        self.home_image = pygame.image.load(ROOT_DIR + '/assets/textures/home.png')
+        self.home_image_clicked = pygame.image.load(ROOT_DIR + '/assets/textures/home_clicked.png')
+        self.quit_image = pygame.image.load(ROOT_DIR + '/assets/textures/quit.png')
+        self.quit_image_clicked = pygame.image.load(ROOT_DIR + '/assets/textures/quit_clicked.png')
+        self.sound_image = pygame.image.load(ROOT_DIR + '/assets/textures/sound_on.png')
+        self.sound_image_clicked = pygame.image.load(ROOT_DIR + '/assets/textures/sound_on_clicked.png')
+        self.mute_image = pygame.image.load(ROOT_DIR + '/assets/textures/sound_mute.png')
+        self.mute_image_clicked = pygame.image.load(ROOT_DIR + '/assets/textures/sound_mute_clicked.png')
 
         pygame.font.init()
         self.banner_font = pygame.font.Font(ROOT_DIR + '/assets/fonts/timer.ttf', BANNER_FONT_SIZE)
@@ -103,201 +91,123 @@ class Game:
         self.flag_sound = pygame.mixer.Sound(ROOT_DIR + '/assets/sounds/flag_place.mp3')
         self.click_sound = pygame.mixer.Sound(ROOT_DIR + '/assets/sounds/tile_click.mp3')
         self.victory_sound = pygame.mixer.Sound(ROOT_DIR + '/assets/sounds/victory.mp3')
-        
-    def start(self) -> bool:
+    
+    def load(self, difficulty: str):
         """
-        Loads game elements and executes main loop.
+        Configures the Game based on the selected difficulty and initializes pygame elements.
 
-        Returns:
-            bool: True iff the tkinter menu should be reopened upon quitting.
+        Params:
+            str: The game difficulty ('beginner', 'intermediate', or 'expert').
         """
+        self.quitting = False
+        self.reopen_tkinter = False
+
+        # configure difficulty specifications
+        difficulty_data = DIFFICULTIES['beginner']
+        if difficulty in DIFFICULTIES.keys():
+            difficulty_data = DIFFICULTIES[difficulty]
+        self.num_mines = difficulty_data['num_mines']
+        self.rows = difficulty_data['rows']
+        self.cols = difficulty_data['cols']
+
+        # initialize pygame window
+        pygame.display.init()
+        if self.cols >= DIFFICULTIES['intermediate']['cols']:
+            self.screen_width = TILE_SIZE * (self.cols + 2*MARGIN)
+        else:
+            self.screen_width = TILE_SIZE * (DIFFICULTIES['intermediate']['cols'] + 2*MARGIN)
+        self.screen_height = TILE_SIZE * (self.rows + 2*MARGIN) + 2*BANNER_HEIGHT
+        self.screen = pygame.display.set_mode((self.screen_width, self.screen_height))
+        pygame.display.set_caption('Minesweeper')
+        pygame.display.set_icon(self.icon)
+
         # load tile textures from tile_atlas.png
-        tile_map = pygame.image.load(ROOT_DIR + '/assets/textures/tile_atlas.png')
+        tile_surfaces = []
         for y in range(4):
             for x in range(4):
                 image = pygame.Surface((TILE_SIZE, TILE_SIZE))
                 area = (x*TILE_SIZE, y*TILE_SIZE, TILE_SIZE, TILE_SIZE)
-                image.blit(tile_map, (0, 0), area)
-                self.tile_surfaces.append(image)
+                image.blit(self.tile_map, (0, 0), area)
+                tile_surfaces.append(image)
+        
+        # load tile sprites
+        self.tiles = []
+        self.field_top_left = ((self.screen_width - self.cols*TILE_SIZE)/2, (self.screen_height - self.rows*TILE_SIZE)/2)
+        for x in range(self.cols):
+            self.tiles.append([])
+            for y in range(self.rows):
+                new_tile = Tile(tile_surfaces, (x, y), self.field_top_left)
+                self.tiles[x].append(new_tile)
         
         # load face button texture tuples (unclicked, clicked) from face_atlas.png
-        faces = pygame.image.load(ROOT_DIR + '/assets/textures/face_atlas.png')
+        face_surfaces = []
         hidden_area = ((TileStates.HIDDEN%4)*TILE_SIZE, int(TileStates.HIDDEN/4)*TILE_SIZE, TILE_SIZE, TILE_SIZE)
         uncovered_area = ((TileStates.UNCOVERED%4)*TILE_SIZE, int(TileStates.UNCOVERED/4)*TILE_SIZE, TILE_SIZE, TILE_SIZE)
+        button_size = (3*TILE_SIZE, 3*TILE_SIZE)
         for x in range(4):
             # place each face texture on top of unclicked and clicked tile textures
             default_image = pygame.Surface((TILE_SIZE, TILE_SIZE))
             clicked_image = pygame.Surface((TILE_SIZE, TILE_SIZE))
-            default_image.blit(tile_map, (0, 0), hidden_area)
-            clicked_image.blit(tile_map, (0, 0), uncovered_area)
-            default_image = pygame.transform.scale(default_image, (3*TILE_SIZE, 3*TILE_SIZE))
-            clicked_image = pygame.transform.scale(clicked_image, (3*TILE_SIZE, 3*TILE_SIZE))
-            # area on face_atlas.png to blit from
-            area = (x*TILE_SIZE, 0, TILE_SIZE, TILE_SIZE)
+            default_image.blit(self.tile_map, (0, 0), hidden_area)
+            clicked_image.blit(self.tile_map, (0, 0), uncovered_area)
+            default_image = pygame.transform.scale(default_image, button_size)
+            clicked_image = pygame.transform.scale(clicked_image, button_size)
+            area = (x*TILE_SIZE, 0, TILE_SIZE, TILE_SIZE) # area on face_atlas.png to blit from
             face_image = pygame.Surface((TILE_SIZE, TILE_SIZE), pygame.SRCALPHA)
-            face_image.blit(faces, (0, 0), area)
+            face_image.blit(self.face_map, (0, 0), area)
             face_image = pygame.transform.scale(face_image, (2*TILE_SIZE, 2*TILE_SIZE))
             face_loc = ((default_image.get_width() - face_image.get_width())/2, (default_image.get_height() - face_image.get_height())/2)
             default_image.blit(face_image, face_loc)
             clicked_image.blit(face_image, face_loc)
-            self.face_surfaces.append((default_image, clicked_image))
-        button_size = (default_image.get_width(), default_image.get_height())
-        
-        # load tile sprites
-        tile_group = pygame.sprite.Group()
-        top_left = ((self.screen_width - self.cols*TILE_SIZE)/2, (self.screen_height - self.rows*TILE_SIZE)/2)
-        for x in range(self.cols):
-            self.tiles.append([])
-            for y in range(self.rows):
-                new_tile = Tile(self, self.tile_surfaces, (x, y), top_left)
-                self.tiles[x].append(new_tile)
-                tile_group.add(new_tile)
-        
-        # load top banner
-        banner_group = pygame.sprite.Group()
-        banner_image = pygame.Surface((self.screen_width, BANNER_HEIGHT))
-        banner_image.fill(BANNER_COLOR)
-        banner_bottom = Sprite(banner_image, (0, self.screen_height - BANNER_HEIGHT))
-        flag_image = pygame.image.load(ROOT_DIR + '/assets/textures/flag.png')
-        flag_image = pygame.transform.scale(flag_image, (2*TILE_SIZE, 2*TILE_SIZE))
+            face_surfaces.append((default_image, clicked_image))
+
+        # load top banner static elements
+        banner_surface = pygame.Surface((self.screen_width, BANNER_HEIGHT))
+        banner_surface.fill(BANNER_COLOR)
+        banner_sprite = Sprite(banner_surface, (0, 0))
+        flag_surface = pygame.transform.scale(self.flag_image, (2*TILE_SIZE, 2*TILE_SIZE))
         flag_x = MARGIN * TILE_SIZE
-        flag_y = (BANNER_HEIGHT - flag_image.get_height()) / 2
-        flag_icon = Sprite(flag_image, (flag_x, flag_y))
+        flag_y = (BANNER_HEIGHT - flag_surface.get_height()) / 2
+        flag_icon = Sprite(flag_surface, (flag_x, flag_y))
         button_x = (self.screen_width - button_size[0]) / 2
         button_y = (BANNER_HEIGHT - button_size[1]) / 2
-        face_button = Button(self.face_surfaces, (button_x, button_y), self.restart)
+        self.face_button = Button(face_surfaces, (button_x, button_y), self.restart)
+        self.banner_sprites = [banner_sprite, flag_icon, self.face_button]
 
-        # load bottom banner
-        banner_top = Sprite(banner_image, (0, 0))
-        home_image = pygame.image.load(ROOT_DIR + '/assets/textures/home.png')
-        home_image_clicked = pygame.image.load(ROOT_DIR + '/assets/textures/home_clicked.png')
-        button_x = (self.screen_width - home_image.get_width()) / 2
-        button_y = (self.screen_height - (BANNER_HEIGHT + home_image.get_height())/2)
-        home_button = Button([(home_image, home_image_clicked)], (button_x, button_y), self.quit_to_menu)
-        quit_image = pygame.image.load(ROOT_DIR + '/assets/textures/quit.png')
-        quit_image_clicked = pygame.image.load(ROOT_DIR + '/assets/textures/quit_clicked.png')
-        button_x = (self.screen_width - quit_image.get_width()) / 2 - home_image.get_width()*2
-        button_y = (self.screen_height - (BANNER_HEIGHT + quit_image.get_height())/2)
-        quit_button = Button([(quit_image, quit_image_clicked)], (button_x, button_y), self.exit)
-        sound_image = pygame.image.load(ROOT_DIR + '/assets/textures/sound_on.png')
-        sound_image_clicked = pygame.image.load(ROOT_DIR + '/assets/textures/sound_on_clicked.png')
-        mute_image = pygame.image.load(ROOT_DIR + '/assets/textures/sound_mute.png')
-        mute_image_clicked = pygame.image.load(ROOT_DIR + '/assets/textures/sound_mute_clicked.png')
-        button_x = (self.screen_width - sound_image.get_width()) / 2 + home_image.get_width()*2
-        button_y = (self.screen_height - (BANNER_HEIGHT + sound_image.get_height())/2)
-        sound_button = Button([(mute_image, mute_image_clicked), (sound_image, sound_image_clicked)],
-                              (button_x, button_y), self.toggle_sound)
-        sound_button.state = self.sound
+        # load footer
+        footer_surface = Sprite(banner_surface, (0, self.screen_height - BANNER_HEIGHT))
+        button_x = (self.screen_width - self.home_image.get_width()) / 2
+        button_y = (self.screen_height - (BANNER_HEIGHT + self.home_image.get_height())/2)
+        home_button = Button([(self.home_image, self.home_image_clicked)], (button_x, button_y), self.quit_to_menu)
+        pad_x = self.home_image.get_width() * 2
+        button_x = (self.screen_width - self.quit_image.get_width()) / 2 - pad_x
+        button_y = (self.screen_height - (BANNER_HEIGHT + self.quit_image.get_height())/2)
+        quit_button = Button([(self.quit_image, self.quit_image_clicked)], (button_x, button_y), self.quit)
+        button_x = (self.screen_width - self.sound_image.get_width()) / 2 + pad_x
+        button_y = (self.screen_height - (BANNER_HEIGHT + self.sound_image.get_height())/2)
+        self.sound_button = Button([(self.mute_image, self.mute_image_clicked), (self.sound_image, self.sound_image_clicked)],
+                                   (button_x, button_y), self.toggle_sound)
+        self.sound_button.state = self.sound_enabled
+        self.footer_sprites = [footer_surface, home_button, quit_button, self.sound_button]
 
-        # load win menu
-        win_menu_group = pygame.sprite.Group()
-        win_top_left = ((self.screen_width - WIN_MENU_SIZE[0])/2, (self.screen_height - WIN_MENU_SIZE[1])/2)
-        win_menu_rect = pygame.Rect(win_top_left[0], win_top_left[1], WIN_MENU_SIZE[0], WIN_MENU_SIZE[1])
-        win_menu_bg = pygame.Surface(pygame.Rect(win_menu_rect).size, pygame.SRCALPHA)
-        pygame.draw.rect(win_menu_bg, WIN_MENU_COLOR, win_menu_bg.get_rect())
+        self.buttons = [self.face_button, quit_button, home_button, self.sound_button]
+
+        # load win screen static elements
+        win_top_left = ((self.screen_width - WIN_SCREEN_SIZE[0])/2, (self.screen_height - WIN_SCREEN_SIZE[1])/2)
+        self.win_screen_rect = pygame.Rect(win_top_left[0], win_top_left[1], WIN_SCREEN_SIZE[0], WIN_SCREEN_SIZE[1])
+        self.win_screen_bg = pygame.Surface(self.win_screen_rect.size, pygame.SRCALPHA)
+        pygame.draw.rect(self.win_screen_bg, WIN_SCREEN_COLOR, self.win_screen_bg.get_rect())
         text_surface = self.win_font_title.render("You won!", False, WIN_FONT_COLOR)
-        win_message_pos = (win_top_left[0] + (WIN_MENU_SIZE[0] - text_surface.get_width())/2, win_top_left[1] + PAD_Y)
+        win_message_pos = (win_top_left[0] + (WIN_SCREEN_SIZE[0] - text_surface.get_width())/2, win_top_left[1] + WIN_PAD_Y)
         win_message = Sprite(text_surface, win_message_pos)
-        # the height at which to position the time display on win
-        time_disp_pos_y = win_message_pos[1] + text_surface.get_height()
-
-        win_menu_group.add(win_message)
-
-        # game loop
-        clock = pygame.time.Clock()
-        while not self.quit:
-            for event in pygame.event.get():
-                if event.type == QUIT:
-                    pygame.quit()
-                    self.game_over = True
-                    self.quit = True
-                    break
-                elif event.type == MOUSEBUTTONUP:
-                    # prevent multiple sprites from being clicked at the same time
-                    quit_button.check_click(event.pos, event.button)
-                    home_button.check_click(event.pos, event.button)
-                    sound_button.check_click(event.pos, event.button)
-                    face_button.check_click(event.pos, event.button)
-                    if not self.game_over:
-                        for sprite in tile_group:
-                            if sprite.check_click(event.pos, event.button):
-                                break
-
-            if not self.quit:
-                sound_button.state = self.sound
-                quit_button.check_mouse_press(pygame.mouse.get_pos())
-                home_button.check_mouse_press(pygame.mouse.get_pos())
-                sound_button.check_mouse_press(pygame.mouse.get_pos())
-                face_button.check_mouse_press(pygame.mouse.get_pos())
-
-                if not self.game_over:
-                    buttons_pressed = pygame.mouse.get_pressed()
-                    if buttons_pressed[0]:
-                        click_location = pygame.mouse.get_pos()
-                        bottom_right = (top_left[0] + TILE_SIZE*self.cols, top_left[1] + TILE_SIZE*self.rows)
-                        if click_location[0] >= top_left[0] and click_location[1] >= top_left[1] \
-                            and click_location[0] <= bottom_right[0] and click_location[1] <= bottom_right[1]:
-                            self.face_state = FaceExpressions.SHOCKED
-                        else:
-                            self.face_state = FaceExpressions.HAPPY
-                    else:
-                        self.face_state = FaceExpressions.HAPPY
-                
-                    for sprite in tile_group:
-                        if sprite not in self.to_chord:
-                            sprite.check_mouse_press(pygame.mouse.get_pos())
-                    self.to_chord = []
-
-                    if len(self.mines) > 0:
-                        self.time += 1.0 / FRAMERATE
-
-                # update banner elements
-                banner_group = pygame.sprite.Group()
-                # flag counter
-                flags_remaining = self.num_mines - len(self.flags)
-                text = str(abs(flags_remaining))
-                if flags_remaining >= 0:
-                    text = text.rjust(3, '0')
-                else:
-                    text = '-' + text.rjust(2, '0')
-                text_surface = self.banner_font.render(text, False, BANNER_FONT_COLOR, BANNER_FONT_BG)
-                flag_counter = Sprite(text_surface,
-                                      (flag_x + flag_image.get_width(), (BANNER_HEIGHT - BANNER_FONT_SIZE)/2))
-                # timer
-                timer_text = utils.time_to_str(self.time)
-                text_surface = self.banner_font.render(timer_text, False, BANNER_FONT_COLOR, BANNER_FONT_BG)
-                timer = Sprite(text_surface,
-                               (self.screen_width - MARGIN*TILE_SIZE - text_surface.get_width(), (BANNER_HEIGHT - BANNER_FONT_SIZE)/2))
-                face_button.state = self.face_state
-                banner_group.add(banner_top, banner_bottom, flag_icon, flag_counter, timer, face_button, quit_button, home_button, sound_button)
-
-                # render game elements
-                self.screen.fill(BG_COLOR)
-                tile_group.draw(self.screen)
-                banner_group.draw(self.screen)
-                if self.game_over and self.face_state == FaceExpressions.WIN:
-                    self.screen.blit(win_menu_bg, win_menu_rect)
-                    win_menu_group.draw(self.screen)
-
-                    win_menu_dynamic_group = pygame.sprite.Group()
-                    text_surface = self.win_font_lg.render(timer_text, False, WIN_FONT_COLOR)
-                    time_display = Sprite(text_surface,
-                            (win_top_left[0] + (WIN_MENU_SIZE[0] - text_surface.get_width())/2, time_disp_pos_y))
-                    win_menu_dynamic_group.add(time_display)
-                    win_menu_dynamic_group.draw(self.screen)
-                pygame.display.flip()
-            
-            clock.tick(FRAMERATE)
-        
-        pygame.quit()
-        return self.reopen_tkinter
+        self.win_screen_sprites = [win_message]
 
     def restart(self):
         """
-        Resets game variables and Tiles.
+        Resets the game state to a new game of the same difficulty.
         """
         self.game_over = False
-        self.visited: list[list[bool]] = [[False]*self.rows for y in range(self.cols)]
+        self.visited = [[False]*self.rows for y in range(self.cols)]
         self.mines = []
         self.flags = []
         self.uncovered_tiles: int = 0
@@ -308,17 +218,260 @@ class Game:
                 self.tiles[x][y].update_state(TileStates.HIDDEN)
                 self.tiles[x][y].is_mine = False
 
-    def plant_mines(self, click_pos: tuple[int, int]):
+    def start(self, difficulty: str = 'beginner') -> bool:
         """
-        Randomly populates the field with mines, excluding the clicked Tile.
+        Loads Game elements and executes the main loop that handles all events.
 
         Params:
-            tuple[int, int]: The position (x, y) within the field of the clicked Tile.
+            str: The game difficulty ('beginner', 'intermediate', or 'expert').
+        
+        Returns:
+            bool: True iff the tkinter startup menu should be reopened upon quitting.
+        """
+        self.load(difficulty)
+        self.restart()
+
+        # game loop
+        clock = pygame.time.Clock()
+        while not self.quitting:
+            for event in pygame.event.get():
+                if event.type == QUIT:
+                    self.game_over = True
+                    self.quitting = True
+                    pygame.quit()
+                    break
+                elif event.type == MOUSEBUTTONUP:
+                    for button in self.buttons:
+                        if button.check_click(event.pos, event.button):
+                            break
+                    if not self.game_over:
+                        self.check_tile_click(event)
+            
+            if not self.quitting:
+                self.sound_button.state = self.sound_enabled
+                for button in self.buttons:
+                    button.check_mouse_press(pygame.mouse.get_pos())
+
+                if not self.game_over:
+                    self.check_tile_press()
+                    self.update_face_button()
+
+                    if len(self.mines) > 0:
+                        self.time += 1.0 / FRAMERATE
+            
+                self.render()
+                clock.tick(FRAMERATE)
+        
+        pygame.display.quit()
+        return self.reopen_tkinter
+
+    def render(self):
+        """
+        Updates dynamic visual elements and displays all Sprites.
+        """
+        tile_group = pygame.sprite.Group()
+        for x in range(self.cols):
+            for y in range(self.rows):
+                tile_group.add(self.tiles[x][y])
+
+        # load dynamic banner elements
+        flags_remaining = self.num_mines - len(self.flags)
+        text = str(abs(flags_remaining))
+        if flags_remaining >= 0:
+            text = text.rjust(3, '0')
+        else:
+            text = '-' + text.rjust(2, '0')
+        text_surface = self.banner_font.render(text, False, BANNER_FONT_COLOR, BANNER_FONT_BG)
+        flag_counter = Sprite(text_surface,
+                              (MARGIN*TILE_SIZE + 2*self.flag_image.get_width(), (BANNER_HEIGHT - BANNER_FONT_SIZE)/2))
+        # timer
+        timer_text = time_to_str(self.time)
+        text_surface = self.banner_font.render(timer_text, False, BANNER_FONT_COLOR, BANNER_FONT_BG)
+        timer = Sprite(text_surface,
+                        (self.screen_width - MARGIN*TILE_SIZE - text_surface.get_width(), (BANNER_HEIGHT - BANNER_FONT_SIZE)/2))
+        banner_group = pygame.sprite.Group()
+        for element in self.banner_sprites:
+            banner_group.add(element)
+        banner_group.add(flag_counter, timer)
+
+        footer_group = pygame.sprite.Group()
+        for element in self.footer_sprites:
+            footer_group.add(element)
+
+        # display game elements
+        self.screen.fill(BG_COLOR)
+        tile_group.draw(self.screen)
+        banner_group.draw(self.screen)
+        footer_group.draw(self.screen)
+        if self.game_over and self.face_button.state == FaceExpressions.WIN:
+            self.screen.blit(self.win_screen_bg, self.win_screen_rect)
+            win_screen_group = pygame.sprite.Group()
+            for element in self.win_screen_sprites:
+                win_screen_group.add(element)
+
+            # load dynamic win screen elements
+            text_surface = self.win_font_lg.render(timer_text, False, WIN_FONT_COLOR)
+            pos_x = self.win_screen_rect.x + (WIN_SCREEN_SIZE[0] - text_surface.get_width())/2
+            pos_y = self.win_screen_sprites[0].rect.y + self.win_screen_sprites[0].rect.height
+            time_display = Sprite(text_surface, (pos_x, pos_y))
+            win_screen_group.add(time_display)
+            win_screen_group.draw(self.screen)
+        
+        pygame.display.flip()
+
+    def check_tile_click(self, event: pygame.event.Event):
+        """
+        Attempts to find a Tile at the click location, executing the corresponding function if a Tile was clicked.
+
+        Params:
+            Event: A pygame mouse click event (MOUSEBUTTONUP).
+        """
+        tile_x = (event.pos[0] - self.field_top_left[0]) / TILE_SIZE
+        tile_y = (event.pos[1] - self.field_top_left[1]) / TILE_SIZE
+        if tile_x >= 0 and tile_x < self.cols and tile_y >= 0 and tile_y < self.rows:
+            x = int(tile_x)
+            y = int(tile_y)
+            tile = self.tiles[x][y]
+            if tile.check_click(event.pos, event.button):
+                if event.button == BUTTON_LEFT:
+                    self.tile_left_click((x, y))
+                elif event.button == BUTTON_RIGHT:
+                    self.tile_right_click((x, y))
+                return
+    
+    def tile_left_click(self, pos: tuple[int, int]):
+        """
+        Tile left click mechanics, including chording if the right mouse button is also pressed.
+
+        Params:
+            tuple[int, int]: The Tile position within the 2D array.
+        """
+        tile = self.tiles[pos[0]][pos[1]]
+        pressed = pygame.mouse.get_pressed()
+        # right mouse button also pressed
+        if pressed[2]:
+            if tile.state != TileStates.HIDDEN and tile.state != TileStates.FLAG:
+                self.chord(pos, tile.state)
+        elif tile.state == TileStates.HIDDEN:
+            if tile.is_mine:
+                tile.update_state(TileStates.MINE_HIT)
+                self.loss()
+            else:
+                if self.sound_enabled:
+                    self.click_sound.play()
+                self.uncover(pos)
+    
+    def tile_right_click(self, pos: tuple[int, int]):
+        """
+        Toggles whether the Tile is flagged, or chords if left mouse button is also pressed.
+
+        Params:
+            tuple[int, int]: The Tile position within the 2D array.
+        """
+        tile = self.tiles[pos[0]][pos[1]]
+        pressed = pygame.mouse.get_pressed()
+        # left mouse button also pressed
+        if pressed[0]:
+            if tile.state != TileStates.HIDDEN and tile.state != TileStates.FLAG:
+                self.chord(pos, tile.state)
+        elif tile.state == TileStates.HIDDEN:
+            tile.update_state(TileStates.FLAG)
+            self.flags.append(pos)
+            if self.sound_enabled:
+                self.flag_sound.play()
+        elif tile.state == TileStates.FLAG:
+            tile.update_state(TileStates.HIDDEN)
+            self.flags.remove(pos)
+
+    def check_tile_press(self):
+        """
+        Checks whether each Tile Sprite is currently being clicked and executes subsequent functions.
+        """
+        pressed = pygame.mouse.get_pressed()
+        for x in range(self.cols):
+            for y in range(self.rows):
+                tile = self.tiles[x][y]
+                if tile not in self.to_chord:
+                    if tile.check_mouse_press(pygame.mouse.get_pos()):
+                        # right mouse button also pressed
+                        if pressed[2]:
+                            self.press_chord((x, y), tile.state)
+        self.to_chord = []
+
+    def get_chord_info(self, pos: tuple[int, int], num_flags: int) -> tuple[bool, list[Tile]]:
+        """
+        Checks if a tile can be chorded and gets the list of tiles that would be uncovered with a chord
+            (left and right click simultaneously).
+
+        Params:
+            tuple[int, int]: The Tile position within the 2D array.
+            int: The number of flags that must be adjacent to the Tile in order to chord.
+        
+        Returns:
+            tuple[bool, list[Tile]]: A boolean representing whether the Tile can currently be chorded
+                and the list of tiles that would be uncovered if the chord is valid.
+        """
+        flag_count = 0
+        neighbors = []
+        x_min = pos[0] - 1 if pos[0] - 1 >= 0 else 0
+        y_min = pos[1] - 1 if pos[1] - 1 >= 0 else 0
+        x_max = pos[0] + 1 if pos[0] + 1 < self.cols else self.cols - 1
+        y_max = pos[1] + 1 if pos[1] + 1 < self.rows else self.rows - 1
+        for x in range(x_min, x_max + 1):
+            for y in range(y_min, y_max + 1):
+                if (x, y) != (pos[0], pos[1]):
+                    neighbor = self.tiles[x][y]
+                    if neighbor.state == TileStates.FLAG:
+                        flag_count += 1
+                    elif neighbor.state == TileStates.HIDDEN:
+                        neighbors.append(neighbor)
+
+        return (flag_count == num_flags, neighbors)
+
+    def chord(self, pos: tuple[int, int], num_flags: int):
+        """
+        If the correct number of adjacent Tiles has been flagged, uncovers all adjacent hidden Tiles.
+
+        Params:
+            tuple[int, int]: The position within the 2D array of the center Tile.
+            int: The number of flags that must be adjacent to the center Tile in order to chord.
+        """
+        chord_info = self.get_chord_info(pos, num_flags)
+        self.to_chord = chord_info[1]
+
+        if chord_info[0]:
+            for tile in self.to_chord:
+                if tile.is_mine:
+                    tile.update_state(TileStates.MINE_HIT)
+                    self.loss()
+                    return
+            
+            for tile in self.to_chord:
+                if not self.visited[tile.position[0]][tile.position[1]]:
+                    self.uncover(tile.position)
+            if len(self.to_chord) > 0 and self.sound_enabled:
+                self.click_sound.play()
+
+    def press_chord(self, pos: tuple[int, int], num_flags: int):
+        """
+        Displays the pressed texture for all tiles that may be chorded.
+        """
+        self.to_chord = self.get_chord_info(pos, num_flags)[1]
+        for tile in self.to_chord:
+            if tile.state == TileStates.HIDDEN:
+                tile.image = tile.surfaces[TileStates.UNCOVERED]
+
+    def plant_mines(self, pos: tuple[int, int]):
+        """
+        Randomly populates the field with mines, excluding the first Tile clicked.
+
+        Params:
+            tuple[int, int]: The position within the 2D array of the clicked Tile.
         """
         open_tiles = []
         for x in range(self.cols):
             for y in range(self.rows):
-                if (x, y) != click_pos:
+                if (x, y) != pos:
                     open_tiles.append((x, y))
         for i in range(self.num_mines):
             rand_index = random.randint(0, len(open_tiles) - 1)
@@ -327,19 +480,19 @@ class Game:
             self.mines.append((tile_pos[0], tile_pos[1]))
             del open_tiles[rand_index]
 
-    def uncover(self, click_pos: tuple[int, int]):
+    def uncover(self, pos: tuple[int, int]):
         """
         Uncovers the Tile and its surroundings at a given position.
 
         Params:
-            tuple[int, int]: The position (x, y) within the field of the Tile to uncover.
+            tuple[int, int]: The Tile position within the 2D array.
         """
         if len(self.mines) == 0:
-            self.plant_mines(click_pos)
+            self.plant_mines(pos)
 
         # perform breadth first search starting at the clicked tile
-        bfs_queue = [click_pos]
-        self.visited[click_pos[0]][click_pos[1]] = True
+        bfs_queue = [pos]
+        self.visited[pos[0]][pos[1]] = True
         while len(bfs_queue) > 0:
             current = bfs_queue.pop(0)
             mine_count = 0
@@ -370,80 +523,31 @@ class Game:
                 for position in neighbors:
                     self.visited[position[0]][position[1]] = True
 
-    def get_chord_info(self, click_pos: tuple[int, int], num_flags: int) -> tuple[bool, list[Tile]]:
+    def update_face_button(self):
         """
-        Checks if a tile can be chorded and gets the list of tiles that would be uncovered with a chord
-            (left and right click simultaneously).
-
-        Params:
-            tuple[int, int]: The position (x, y) within the field of the Tile.
-            int: The number of flags that must be adjacent to the Tile in order to chord.
-        
-        Returns:
-            tuple[bool, list[Tile]]: A boolean representing whether the Tile can currently be chorded
-                and the list of tiles that would be uncovered if the chord was valid.
+        Changes facial expression to shocked iff a Tile is being clicked.
         """
-        flag_count = 0
-        neighbors = []
-        x_min = click_pos[0] - 1 if click_pos[0] - 1 >= 0 else 0
-        y_min = click_pos[1] - 1 if click_pos[1] - 1 >= 0 else 0
-        x_max = click_pos[0] + 1 if click_pos[0] + 1 < self.cols else self.cols - 1
-        y_max = click_pos[1] + 1 if click_pos[1] + 1 < self.rows else self.rows - 1
-        for x in range(x_min, x_max + 1):
-            for y in range(y_min, y_max + 1):
-                if (x, y) != (click_pos[0], click_pos[1]):
-                    neighbor = self.tiles[x][y]
-                    if neighbor.state == TileStates.FLAG:
-                        flag_count += 1
-                    elif neighbor.state == TileStates.HIDDEN:
-                        neighbors.append(neighbor)
-
-        return (flag_count == num_flags, neighbors)
-
-    def chord(self, click_pos: tuple[int, int], num_flags: int):
-        """
-        If the correct number of adjacent Tiles has been flagged, uncovers all adjacent hidden Tiles.
-
-        Params:
-            tuple[int, int]: The position (x, y) within the field of the center Tile.
-            int: The number of flags that must be adjacent to the Tile in order to chord.
-        """
-        chord_info = self.get_chord_info(click_pos, num_flags)
-        self.to_chord = chord_info[1]
-
-        if chord_info[0]:
-            if self.sound:
-                self.click_sound.play()
-            for tile in self.to_chord:
-                if tile.is_mine:
-                    tile.update_state(TileStates.MINE_HIT)
-                    self.loss()
-                    return
-            
-            for tile in self.to_chord:
-                if not self.visited[tile.position[0]][tile.position[1]]:
-                    self.uncover(tile.position)
-    
-    def press_chord(self, click_pos: tuple[int, int], num_flags: int):
-        """
-        Displays the pressed texture for all Tiles that would be uncovered with a chord.
-
-        Params:
-            tuple[int, int]: The position (x, y) within the field of the center Tile.
-            int: The number of flags that must be adjacent to the Tile in order to chord.
-        """
-        self.to_chord = self.get_chord_info(click_pos, num_flags)[1]
-        for tile in self.to_chord:
-            if tile.state == TileStates.HIDDEN:
-                tile.image = tile.surfaces[TileStates.UNCOVERED]
+        pressed = pygame.mouse.get_pressed()
+        # left mouse button
+        if pressed[0]:
+            click_loc = pygame.mouse.get_pos()
+            bottom_right = (self.field_top_left[0] + TILE_SIZE*self.cols,
+                            self.field_top_left[1] + TILE_SIZE*self.rows)
+            if click_loc[0] >= self.field_top_left[0] and click_loc[1] >= self.field_top_left[1] \
+                and click_loc[0] <= bottom_right[0] and click_loc[1] <= bottom_right[1]:
+                self.face_button.state = FaceExpressions.SHOCKED
+            else:
+                self.face_button.state = FaceExpressions.HAPPY
+        else:
+            self.face_button.state = FaceExpressions.HAPPY
 
     def win(self):
         """
         Ends the game and updates the face Button to signify a win.
         """
         self.game_over = True
-        self.face_state = FaceExpressions.WIN
-        if self.sound:
+        self.face_button.state = FaceExpressions.WIN
+        if self.sound_enabled:
             self.victory_sound.play()
 
     def loss(self):
@@ -451,29 +555,32 @@ class Game:
         Ends the game, reveals mistakes and remaining mines, and updates the face Button to signify a loss.
         """
         self.game_over = True
-        self.face_state = FaceExpressions.LOSE
-        if self.sound:
+        self.face_button.state = FaceExpressions.LOSE
+        if self.sound_enabled:
             self.explosion_sound.play()
+        for tile in self.to_chord:
+            tile.mouse_unpress()
         for pos in self.mines:
             self.tiles[pos[0]][pos[1]].reveal()
         for pos in self.flags:
             self.tiles[pos[0]][pos[1]].reveal()
-    
-    def exit(self):
-        """
-        Quits the game and exits the program.
-        """
-        self.quit = True
 
+    def quit(self):
+        """
+        Signifies that the program should exit without reopening the tkinter startup menu.
+        """
+        self.quitting = True
+    
     def quit_to_menu(self):
         """
-        Quits the game and reopens the tkinter main menu.
+        Signifies that the pygame display should quit and the tkinter startup menu be reopened.
         """
-        self.quit = True
+        self.quitting = True
         self.reopen_tkinter = True
-
+    
     def toggle_sound(self):
         """
         Enables/disables sound.
         """
-        self.sound = not self.sound
+        self.sound_enabled = not self.sound_enabled
+    

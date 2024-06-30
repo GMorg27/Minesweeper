@@ -8,6 +8,8 @@ from game import Game
 TK_WIDTH = 400
 TK_HEIGHT = 400
 
+game = Game()
+
 
 def startup_menu():
     """
@@ -21,7 +23,7 @@ def startup_menu():
     screen_width = menu_root.winfo_screenwidth()
     screen_height = menu_root.winfo_screenheight()
     x = screen_width / 2 - TK_WIDTH / 2
-    y = screen_height / 2 -TK_HEIGHT / 2
+    y = screen_height / 2 - TK_HEIGHT / 2
     menu_root.geometry('%dx%d+%d+%d' % (TK_WIDTH, TK_HEIGHT, x, y))
     menu_root.resizable(False, False)
 
@@ -66,14 +68,13 @@ def start_game(root: tk.Tk, game_info: tuple[str, str]):
         tk.Tk: The top level widget representing the main window.
         tuple[str, str]: A tuple containing the game difficulty and player's entered name.
     """
-    root.destroy()
+    root.withdraw() # temporarily close the tkinter window
     difficulty = game_info['difficulty']
     player_name = game_info['name']
-    game = Game(difficulty)
-    # start game and reopen startup menu again if user chooses to return
-    if game.start():
-        del root, game_info, difficulty, player_name, game
-        startup_menu()
+    if game.start(difficulty):
+        root.deiconify() # reopen the tkinter window
+    else:
+        root.destroy() # quit tkinter
 
 
 if __name__ == '__main__':
