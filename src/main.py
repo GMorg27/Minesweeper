@@ -1,15 +1,16 @@
 import tkinter as tk
 import tkinter.font as tkFont
 
-from const import ROOT_DIR
+from const import MAX_NAME_LENGTH, ROOT_DIR
+from data import Data
 from game import Game
 
 
 TK_WIDTH = 400
 TK_HEIGHT = 400
-MAX_NAME_LENGTH = 6
 
-game = Game()
+file_io = Data()
+game = Game(file_io)
 
 
 def startup_menu():
@@ -50,7 +51,7 @@ def startup_menu():
     tk.Label(name_frame, text='Name', font=subtitle_font).pack()
     player_name = tk.StringVar()
     reg = menu_root.register(validate_name) 
-    tk.Entry(name_frame, textvariable=player_name, font=body_font, width=15, validate="key", validatecommand=(reg, '%P')).pack()
+    tk.Entry(name_frame, textvariable=player_name, font=body_font, width=12, validate="key", validatecommand=(reg, '%P')).pack()
     
     button_frame = tk.Frame(menu_root)
     button_frame.pack(side='bottom', pady=padding*2)

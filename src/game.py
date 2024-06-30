@@ -3,7 +3,7 @@ from pygame.locals import *
 import random
 
 from button import Button
-from const import DIFFICULTIES, FRAMERATE, MARGIN, ROOT_DIR, TILE_SIZE
+from const import DIFFICULTIES, FRAMERATE, MARGIN, MAX_NAME_LENGTH, ROOT_DIR, TILE_SIZE
 from data import Data
 from enums import FaceExpressions, TileStates
 from sprite import Sprite
@@ -20,12 +20,13 @@ BANNER_FONT_COLOR = (255, 0, 0)
 BANNER_FONT_BG = (0, 0, 0)
 WIN_SCREEN_SIZE = (9*TILE_SIZE, 11*TILE_SIZE)
 WIN_SCREEN_COLOR = (255, 255, 255, 200)
-WIN_FONT_SIZE_TITLE = 25
-WIN_FONT_SIZE_LG = 20
-WIN_FONT_SIZE_MD = 12
-WIN_FONT_SIZE_SM = 10
+WIN_FONT_SIZE_LG = 25
+WIN_FONT_SIZE_MD = 20
+WIN_FONT_SIZE_SM = 12
 WIN_FONT_COLOR = (0, 0, 0)
+HIGH_SCORE_FONT_COLOR = (218, 165, 32)
 WIN_PAD_Y = 5
+NUM_HIGH_SCORES = 5
 
 
 class Game():
@@ -39,12 +40,13 @@ class Game():
     win_screen_bg: pygame.Surface
     win_screen_rect: pygame.Rect
 
-    def __init__(self):
+    def __init__(self, file_io: Data = Data()):
         """
         Initializes a Game object and loads all assets.
-        """
-        self.player_name: str = ''
 
+        Params:
+            Data: A Data object to read and write to files. Will initialize one if not provided.
+        """
         # game variables
         self.game_over: bool = False
         self.num_mines: int = 0
@@ -70,7 +72,9 @@ class Game():
         self.buttons: list[Button] = []
 
         # file input/output
-        self.file_io: Data = Data()
+        self.player_name: str = ''
+        self.player_rank: int = -1
+        self.file_io: Data = file_io
         settings = self.file_io.get_settings()
         self.sound_enabled: bool = settings['sound_enabled']
 
@@ -89,8 +93,7 @@ class Game():
 
         pygame.font.init()
         self.banner_font = pygame.font.Font(ROOT_DIR + '/assets/fonts/timer.ttf', BANNER_FONT_SIZE)
-        self.win_font_title = pygame.font.Font(ROOT_DIR + '/assets/fonts/courier_new_bd.ttf', WIN_FONT_SIZE_TITLE)
-        self.win_font_lg = pygame.font.Font(ROOT_DIR + '/assets/fonts/helvetica.ttf', WIN_FONT_SIZE_LG)
+        self.win_font_lg = pygame.font.Font(ROOT_DIR + '/assets/fonts/courier_new_bd.ttf', WIN_FONT_SIZE_LG)
         self.win_font_md = pygame.font.Font(ROOT_DIR + '/assets/fonts/helvetica.ttf', WIN_FONT_SIZE_MD)
         self.win_font_sm = pygame.font.Font(ROOT_DIR + '/assets/fonts/helvetica.ttf', WIN_FONT_SIZE_SM)
 
@@ -206,7 +209,7 @@ class Game():
         self.win_screen_rect = pygame.Rect(win_top_left[0], win_top_left[1], WIN_SCREEN_SIZE[0], WIN_SCREEN_SIZE[1])
         self.win_screen_bg = pygame.Surface(self.win_screen_rect.size, pygame.SRCALPHA)
         pygame.draw.rect(self.win_screen_bg, WIN_SCREEN_COLOR, self.win_screen_bg.get_rect())
-        text_surface = self.win_font_title.render("You won!", False, WIN_FONT_COLOR)
+        text_surface = self.win_font_lg.render("You won!", False, WIN_FONT_COLOR)
         win_message_pos = (win_top_left[0] + (WIN_SCREEN_SIZE[0] - text_surface.get_width())/2, win_top_left[1] + WIN_PAD_Y)
         win_message = Sprite(text_surface, win_message_pos)
         self.win_screen_sprites = [win_message]
@@ -322,15 +325,39 @@ class Game():
                 win_screen_group.add(element)
 
             # load dynamic win screen elements
-            text_surface = self.win_font_lg.render(timer_text, False, WIN_FONT_COLOR)
+            text_surface = self.win_font_md.render(timer_text, False, WIN_FONT_COLOR)
             pos_x = self.win_screen_rect.x + (WIN_SCREEN_SIZE[0] - text_surface.get_width())/2
             pos_y = self.win_screen_sprites[0].rect.y + self.win_screen_sprites[0].rect.height
             time_display = Sprite(text_surface, (pos_x, pos_y))
             text = f'%s High Scores' % self.difficulty.capitalize()
-            text_surface = self.win_font_md.render(text, False, WIN_FONT_COLOR)
+            text_surface = self.win_font_sm.render(text, False, WIN_FONT_COLOR)
             pos_x = self.win_screen_rect.x + (WIN_SCREEN_SIZE[0] - text_surface.get_width())/2
             pos_y += time_display.rect.height + WIN_PAD_Y
             high_score_title = Sprite(text_surface, (pos_x, pos_y))
+
+            # display high scores
+            pos_y += high_score_title.rect.height + WIN_PAD_Y
+            all_scores = self.file_io.get_all_scores()
+            if self.difficulty in all_scores.keys():
+                scores = all_scores[self.difficulty]
+                to_display = NUM_HIGH_SCORES if NUM_HIGH_SCORES <= len(scores) else len(scores)
+                for i in range(to_display):
+                    score = scores[i]
+                    name_text = score[0].ljust(MAX_NAME_LENGTH)
+                    time_text = time_to_str(score[1])
+                    font_color = HIGH_SCORE_FONT_COLOR if self.player_rank == i else WIN_FONT_COLOR
+                    # rank and name (left justified)
+                    left_text = f'%s. %s' % (i + 1, name_text)
+                    left_text_surface = self.win_font_sm.render(left_text, False, font_color)
+                    pos_x_left = self.win_screen_rect.x + TILE_SIZE
+                    left_text_sprite = Sprite(left_text_surface, (pos_x_left, pos_y))
+                    # time (right justified)
+                    right_text_surface = self.win_font_sm.render(time_text, False, font_color)
+                    pos_x_right = self.win_screen_rect.x + self.win_screen_rect.width - TILE_SIZE - right_text_surface.get_width()
+                    right_text_sprite = Sprite(right_text_surface, (pos_x_right, pos_y))
+                    win_screen_group.add(left_text_sprite, right_text_sprite)
+                    pos_y += left_text_sprite.rect.height
+
             win_screen_group.add(time_display, high_score_title)
             win_screen_group.draw(self.screen)
         
@@ -566,7 +593,7 @@ class Game():
         self.face_button.state = FaceExpressions.WIN
         if self.sound_enabled:
             self.victory_sound.play()
-        print(self.file_io.add_score(self.time, self.difficulty, self.player_name))
+        self.player_rank = self.file_io.add_score(self.time, self.difficulty, self.player_name)
 
     def loss(self):
         """
@@ -576,12 +603,13 @@ class Game():
         self.face_button.state = FaceExpressions.LOSE
         if self.sound_enabled:
             self.explosion_sound.play()
-        for tile in self.to_chord:
-            tile.mouse_unpress()
         for pos in self.mines:
             self.tiles[pos[0]][pos[1]].reveal()
         for pos in self.flags:
             self.tiles[pos[0]][pos[1]].reveal()
+        for x in range(self.cols):
+            for y in range(self.rows):
+                self.tiles[x][y].mouse_unpress()
 
     def quit(self):
         """

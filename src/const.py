@@ -20,5 +20,6 @@ DIFFICULTIES = {
 }
 FRAMERATE = 30
 MARGIN = 1
+MAX_NAME_LENGTH = 6
 ROOT_DIR = str(Path(__file__).resolve().parent.parent)
 TILE_SIZE = 16

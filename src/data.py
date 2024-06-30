@@ -1,4 +1,5 @@
 import json
+import os
 
 from const import ROOT_DIR
 
@@ -15,10 +16,13 @@ class Data:
 
     def __init__(self):
         """
-        Initializes a Data object.
+        Initializes a Data object, creating the folder for saved data if it does not exist.
         """
         self.high_scores_path: str = ROOT_DIR + '/data/highscores.txt'
         self.settings_path: str = ROOT_DIR + '/data/settings.txt'
+        
+        if not os.path.exists(ROOT_DIR + '/data'):
+            os.makedirs(ROOT_DIR + '/data')
     
     def write_settings(self, data: dict):
         """
