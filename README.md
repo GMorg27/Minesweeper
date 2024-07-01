@@ -13,7 +13,7 @@ This is my implementation of Minesweeper, built entirely with Python and the [Py
 ### Clean user interface
 ![User interface](./screenshots/menu.png)
 ## Installation Instructions
-### Running from Source
+### Run from Source
 * Ensure you are using **Python version 3.7?** or higher. (Not exactly sure where the cutoff is; sorry.)
     * `python --version`
 * Run `pip install -r requirements.txt` from the root directory to install all required packages.
