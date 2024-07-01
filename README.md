@@ -19,7 +19,8 @@ This is my implementation of Minesweeper, built entirely with Python and the [Py
 * Run `pip install -r requirements.txt` from the root directory to install all required packages.
 * To start the program, run `python src/main.py` from the root directory.
 ### Executable (Windows)
-* Download and execute `Minesweeper Installer.exe` to run the installation wizard. This will allow you to choose the installation path. **OR**
+* Download and execute `Minesweeper Installer.exe` to run the installation wizard. This will allow you to choose the installation path.
+**OR**
 * Download and extract `Minesweeper.zip`.
 ## How to Play
 * In the startup menu, select a difficulty:
