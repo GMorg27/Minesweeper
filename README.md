@@ -13,13 +13,14 @@ This is my implementation of Minesweeper, built entirely with Python and the [Py
 ### Clean user interface
 ![User interface](./screenshots/menu.png)
 ## Installation Instructions
-### Building from Source
+### Running from Source
 * Ensure you are using **Python version 3.7?** or higher. (Not exactly sure where the cutoff is; sorry.)
     * `python --version`
 * Run `pip install -r requirements.txt` from the root directory to install all required packages.
 * To start the program, run `python src/main.py` from the root directory.
-### Executable
-* Work in progress. Check back later!
+### Executable (Windows)
+* Download and execute `Minesweeper Installer.exe` to run the installation wizard. This will allow you to choose the installation path. **OR**
+* Download and extract `Minesweeper.zip`.
 ## How to Play
 * In the startup menu, select a difficulty:
     * Beginner: 9x9 grid, 10 mines
@@ -33,6 +34,8 @@ This is my implementation of Minesweeper, built entirely with Python and the [Py
 * If you think a tile has a mine underneath, you can "flag" the tile with the *right* mouse button.
     * Remove a flag by right-clicking it again.
     * The counter in the top-left corner displays the number of mines minus the number of flagged tiles.
+* To quickly reveal all adjacent tiles, click the right/left mouse button while also pressing the opposite button to "chord".
+    * In order to execute a chord, the correct number of flags must be adjacent to the tile.
 * If you reveal every tile that is not a mine, you win! Your name and time will be added to `data/highscores.txt`.
 * To restart with the same difficulty, click the button with the yellow face.
 * To return to the startup menu, click the home button at the bottom of the window.

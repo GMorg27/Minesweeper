@@ -1,3 +1,4 @@
+output
 src/__pycache__/*
 *.svg
 highscores.txt
