@@ -3,7 +3,7 @@ from pygame.locals import *
 import random
 
 from button import Button
-from const import DIFFICULTIES, FRAMERATE, MARGIN, MAX_NAME_LENGTH, ROOT_DIR, TILE_SIZE
+from const import DIFFICULTIES, FRAMERATE, MARGIN, MAX_NAME_LENGTH, NUM_HIGH_SCORES, ROOT_DIR, TILE_SIZE
 from data import Data
 from enums import FaceExpressions, TileStates
 from sprite import Sprite
@@ -26,7 +26,6 @@ WIN_FONT_SIZE_SM = 12
 WIN_FONT_COLOR = (0, 0, 0)
 HIGH_SCORE_FONT_COLOR = (218, 165, 32)
 WIN_PAD_Y = 5
-NUM_HIGH_SCORES = 5
 
 
 class Game():
