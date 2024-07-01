@@ -4,10 +4,10 @@ Minesweeper is a classic, easy-to-learn desktop game in which the goal is to rev
 This is my implementation of Minesweeper, built entirely with Python and the [Pygame](https://www.pygame.org/docs/) and
 [Tkinter](https://docs.python.org/3/library/tkinter.html#module-tkinter) libraries.
 ## Features
-### ![Simple gameplay faithful to the original](../screenshots/gameplay.png)  
-### ![Keep track of local high scores](../screenshots/high_scores.png)  
-### ![Challenge yourself with harder difficulties](../screenshots/loss.png)  
-### ![Clean user interface](../screenshots/menu.png)
+### ![Simple gameplay faithful to the original](./screenshots/gameplay.png)  
+### ![Keep track of local high scores](./screenshots/high_scores.png)  
+### ![Challenge yourself with harder difficulties](./screenshots/loss.png)  
+### ![Clean user interface](./screenshots/menu.png)
 ## Installation Instructions
 ### Building from Source
 * Ensure you are using **Python version 3.7?** or higher. (Not exactly sure where the cutoff is; sorry.)
